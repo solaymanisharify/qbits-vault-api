@@ -1,0 +1,59 @@
+name: Deploy Laravel API to cPanel
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Cache Composer Dependencies
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      # Install Laravel Dependencies
+      - name: Install Dependencies
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --quiet
+
+      # Set Correct Environment File
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "APP_ENV=production" > .env
+            echo "DB_DATABASE=${{ secrets.LIVE_DB_DATABASE }}" >> .env
+            echo "DB_USERNAME=${{ secrets.LIVE_DB_USERNAME }}" >> .env
+            echo "DB_PASSWORD=${{ secrets.LIVE_DB_PASSWORD }}" >> .env
+          else
+            echo "APP_ENV=development" > .env
+            echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+            echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          fi
+        shell: bash
+
+      # Upload Laravel Files to cPanel via FTP
+      - name: Deploy Laravel to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_FTP_SERVER || secrets.FTP_SERVER }}
+          username: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_FTP_USERNAME || secrets.FTP_USERNAME }}
+          password: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_FTP_PASSWORD || secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: /
+          protocol: ftp
+          log-level: verbose
+
+      # Run Laravel Migrations on Both Dev and Main
+      - name: Run Laravel Migrations
+        run: php artisan migrate --force
