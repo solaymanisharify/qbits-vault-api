@@ -11,6 +11,6 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        return $this->orderService->getOrdersFromQbits($request->all());
+        return $this->orderService->getOrdersFromQbits($request);
     }
 }

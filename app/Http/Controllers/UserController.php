@@ -11,16 +11,20 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-     public function __construct(protected UserService $userService) {}
+    public function __construct(protected UserService $userService) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return User::with('roles', 'permissions')->get();
+        return $this->userService->index($request->all());
+    }
+    public function show($id)
+    {
+        return $this->userService->show($id);
     }
 
     public function create(Request $request)
     {
-       return $this->userService->createUser($request->all());
+        return $this->userService->createUser($request->all());
     }
 
     public function assignRole(Request $request, $userId)
@@ -60,5 +64,8 @@ class UserController extends Controller
         return response()->json(['message' => 'Permissions assigned']);
     }
 
-    // Add delete, update as needed
+    public function update(Request $request, $id)
+    {
+        return $this->userService->update($request, $id);
+    }
 }

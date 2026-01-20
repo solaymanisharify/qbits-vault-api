@@ -58,4 +58,10 @@ class Vault extends Model
         // Generate QBV001, QBV002, etc.
         return 'QBV' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
     }
+
+    public function bags()
+    {
+        return $this->hasMany(VaultBag::class);
+    }
+    
 }

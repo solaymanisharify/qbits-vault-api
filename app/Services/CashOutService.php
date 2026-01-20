@@ -2,28 +2,31 @@
 
 namespace App\Services;
 
-use App\Repositories\CashInRepository;
 use App\Repositories\CashInRequiredRepository;
+use App\Repositories\CashOutBagRepository;
+use App\Repositories\CashOutRepository;
+use App\Repositories\CashOutRequiredRepository;
 use Illuminate\Support\Facades\DB;
 
 
-class CashInService
+class CashOutService
 {
 
-    public function __construct(protected CashInRepository $cashInRepo, protected UserService $userService, protected CashInRequiredRepository $cashInRequired, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected CashOutRepository $cashOutRepo, protected CashOutBagRepository $cashOutBagRepo, protected UserService $userService, protected CashOutRequiredRepository $cashOutRequired, protected VaultBagService $vaultBagService) {}
 
     public function getAll()
     {
-        return  $this->cashInRepo->getAll(request()->only('search', 'user_id'));
+        return  $this->cashOutRepo->getAll(request()->only('search', 'user_id'));
     }
 
     public function find($id)
     {
-        return $this->cashInRepo->find($id);
+        return $this->cashOutRepo->find($id);
     }
 
-    public function createCashIn(array $data)
+    public function createCashOut(array $data)
     {
+
         $data["user_id"] = auth()->id();
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
@@ -31,13 +34,27 @@ class CashInService
 
         return DB::transaction(function () use ($data) {
             $data["tran_id"] = uniqid();
-            $cashIn = $this->cashInRepo->create($data);
+            $cashOut = $this->cashOutRepo->create($data);
 
-            // Get users with 'cash-in.verify' permission
-            $verifiers = $this->userService->getAllUsersPermissionByName('cash-in.verify');
+            $cashOutId = $cashOut->id;
 
-            // Get users with 'cash-in.approve' permission
-            $approvers = $this->userService->getAllUsersPermissionByName('cash-in.approve');
+            foreach ($data["bags"] as $bag) {
+                $cashOutBagData = [
+                    'cash_out_id' => $cashOutId,  // Use the stored ID
+                    'bags_id' => $bag['id'],
+                    'verifier_status' => $data["verifier_status"],
+                    'status' => $data["status"],
+                ];
+
+                $cashOut = $this->cashOutBagRepo->createCashOutBag($cashOutBagData);
+            }
+
+
+            // Get users with 'cash-out.verify' permission
+            $verifiers = $this->userService->getAllUsersPermissionByName('cash-out.verify');
+
+            // Get users with 'cash-out.approve' permission
+            $approvers = $this->userService->getAllUsersPermissionByName('cash-out.approve');
 
             // Optional: Exclude super-admin or admin (adjust role/spatie check as per your system)
             $verifiers = $verifiers->reject(function ($user) {
@@ -51,22 +68,19 @@ class CashInService
 
             // Create verifier records
             foreach ($verifiers as $verifier) {
-                $this->cashInRequired->create([
-                    'cash_in_id' => $cashIn->id,
+                $this->cashOutRequired->create([
+                    'cash_out_id' => $cashOutId,
                     'user_id'    => $verifier->id,
-                    // 'type'       => 'verifier', // optional: if you have a type column
                 ]);
             }
 
             // Create approver records
             foreach ($approvers as $approver) {
-                $this->cashInRequired->createApprover([
-                    'cash_in_id' => $cashIn->id,
+                $this->cashOutRequired->createApprover([
+                    'cash_out_id' => $cashOutId,
                     'user_id'    => $approver->id,
                     // 'type'       => 'approver', // optional
                 ]);
-                // Or if you have a separate method/table:
-                // $this->cashInRequired->createApprover([...]);
             }
 
             return successResponse("Successfully created cash-in", [], 200);
@@ -109,12 +123,12 @@ class CashInService
     //         200
     //     );
     // }
-    public function getVerifierAllPendingCashInsByStatus()
+    public function getVerifierAllPendingCashOutsByStatus()
     {
         $user = auth()->user();
 
-        $canVerify = $user->can('cash-in.verify');
-        $canApprove = $user->can('cash-in.approve');
+        $canVerify = $user->can('cash-out.verify');
+        $canApprove = $user->can('cash-out.approve');
 
         // Check if user has at least one required permission
         if (!$canVerify && !$canApprove) {
@@ -124,39 +138,39 @@ class CashInService
         // If user has BOTH permissions, return combined data
         if ($canVerify && $canApprove) {
             // Get cash-ins pending verification by this user
-            $pendingVerification = $this->cashInRepo->getPendingForVerifier($user->id);
+            $pendingVerification = $this->cashOutRepo->getPendingForVerifier($user->id);
 
             // Get cash-ins pending approval (already verified)
-            $pendingApproval = $this->cashInRepo->getPendingForApprover();
+            $pendingApproval = $this->cashOutRepo->getPendingForApprover();
 
             // Merge both collections and remove duplicates by ID
-            $cashIns = $pendingVerification->merge($pendingApproval)->unique('id');
+            $cashOuts = $pendingVerification->merge($pendingApproval)->unique('id');
         }
         // If user has ONLY verify permission
         elseif ($canVerify) {
-            $cashIns = $this->cashInRepo->getPendingForVerifier($user->id);
+            $cashOuts = $this->cashOutRepo->getPendingForVerifier($user->id);
         }
         // If user has ONLY approve permission
         else {
-            $cashIns = $this->cashInRepo->getPendingForApprover();
+            $cashOuts = $this->cashOutRepo->getPendingForApprover();
         }
 
         return successResponse(
             "Successfully fetched pending cash-ins",
-            $cashIns->load(['requiredVerifiers.user', 'vault', 'bags']),
+            $cashOuts->load(['requiredVerifiers.user', 'vault', 'cashOutBags.bag']),
             200
         );
     }
 
-    public function approved($request, $cashInId)
+    public function approved($request, $cashOutId)
     {
         info($request);
         $user = auth()->user();
-        $cashIn = $this->find($cashInId);
+        $cashOut = $this->find($cashOutId);
 
 
         // Must have permission
-        if (!$user->can('cash-in.approve')) {
+        if (!$user->can('cash-out.approve')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -167,28 +181,19 @@ class CashInService
 
         // $action = $request["action"];
 
-        // Check if this user is a required verifier for this CashIn
-        $requiredApprover = $cashIn->requiredApprovers()
+        // Check if this user is a required verifier for this Cashout
+        $requiredApprover = $cashOut->requiredApprovers()
             ->where('user_id', $user->id)
             ->first();
 
-        info("approver" . $requiredApprover);
 
         if (!$requiredApprover) {
-            return response()->json(['error' => 'You are not assigned as a approver for this CashIn'], 403);
+            return response()->json(['error' => 'You are not assigned as a approver for this CashOut'], 403);
         }
 
         if ($requiredApprover->approved) {
-            return response()->json(['error' => 'You have already approvered this CashIn'], 400);
+            return response()->json(['error' => 'You have already approvered this CashOut'], 400);
         }
-
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
 
         // Mark as verified in required table
         $requiredApprover->update([
@@ -197,75 +202,48 @@ class CashInService
         ]);
 
         // Check if ALL required verifiers have verified
-        $totalRequired = $cashIn->requiredApprovers()->count();
-        $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
+        $totalRequired = $cashOut->requiredApprovers()->count();
+        $totalApproved = $cashOut->requiredApprovers()->where('approved', true)->count();
 
-        info($totalRequired);
 
         if ($totalApproved === $totalRequired) {
 
-            $result = handleHttpRequest('POST', env('QBITS_SERVICE_BASE_URL') . '/deposit-orders', [
-                'token' => env('QBITS_SERVICE_TOKEN'),
-            ], [$cashIn]);
 
-            info($result);
+            $bags = $cashOut->cashOutBags;
 
-            if ($result['success'] === true) {
-                $cashIn->status = 'approved';
-                $cashIn->save();
+            info($bags);
 
-                $bag = $cashIn->bags;
+            foreach ($bags as $cashOutBag) {
 
-                /// make in cashIns relations bags there update the data amount will be add with old number do it
-                if ($bag) {
-                    $bag->current_amount += $cashIn->cash_in_amount; // add to existing
-                    $bag->last_cash_in_amount = $cashIn->cash_in_amount;
-                    $bag->last_cash_in_at = now();
-                    $bag->last_cash_in_by = $cashIn->user_id; // or auth()->id()
-                    $bag->last_cash_in_tran_id = $cashIn->tran_id;
+                $bag = $cashOutBag->bag;
 
-                    // Merge denominations
-                    $oldDenominations = is_string($bag->denominations)
-                        ? json_decode($bag->denominations, true)
-                        : ($bag->denominations ?? []);
-
-                    $newDenominations = is_string($cashIn->denominations)
-                        ? json_decode($cashIn->denominations, true)
-                        : ($cashIn->denominations ?? []);
-
-                    $bag->denominations = 
-                        $mergedDenominations = $oldDenominations;
-                    foreach ($newDenominations as $denom => $count) {
-                        if (isset($mergedDenominations[$denom])) {
-                            $mergedDenominations[$denom] += $count;
-                        } else {
-                            $mergedDenominations[$denom] = $count;
-                        }
-                    }
-
-                    info($mergedDenominations);
-
-                    $bag->denominations = json_encode($mergedDenominations);
-
-                    // Optional: update statistics
-                    $bag->total_cash_in_attempts += 1;
-                    $bag->total_successful_deposits += 1;
-
-                    // Optional: add to history
-                    // $history = $bag->history ?? [];
-                    // $history[] = [
-                    //     'action' => 'cash_in',
-                    //     'amount' => $cashIn->cash_in_amount,
-                    //     'tran_id' => $cashIn->tran_id,
-                    //     'by' => $cashIn->user_id,
-                    //     'at' => now()->toDateTimeString(),
-                    //     'note' => 'Deposited via cash-in approval',
-                    // ];
-                    // $bag->history = $history;
-
-                    $bag->save();
+                if (!$bag) {
+                    continue; // safety check
                 }
+
+
+                $bag->current_amount = 0;
+                $bag->denominations = [];
+
+                $bag->last_cash_out_amount = $cashOut->cash_out_amount;
+                $bag->last_cash_out_at = now();
+                $bag->last_cash_out_by = $cashOut->user_id; // or auth()->id()
+                $bag->last_cash_out_tran_id = $cashOut->tran_id;
+
+                // Optional: update statistics
+                $bag->total_cash_out_attempts += 1;
+                // $bag->total_successful_deposits += 1;
+
+                $bag->save();
             }
+
+            $vault = $cashOut->vault;
+            $vault->balance -= $cashOut->cash_out_amount;
+            $vault->last_cash_out = now();
+            $vault->save();
+
+            $cashOut->status = 'approved';
+            $cashOut->save();
         }
 
         // Handle approve/reject (only if user has permission)
@@ -279,20 +257,20 @@ class CashInService
 
         return response()->json([
             'message' => ' recorded successfully',
-            'verifier_status' => $cashIn->verifier_status,
-            'status' => $cashIn->status,
+            'verifier_status' => $cashOut->verifier_status,
+            'status' => $cashOut->status,
         ]);
     }
-    public function verify($request, $cashInId)
+    public function verify($request, $cashOutId)
     {
         info($request);
         $user = auth()->user();
-        $cashIn = $this->find($cashInId);
+        $cashOut = $this->find($cashOutId);
 
-        info($cashIn);
+        info($cashOut);
 
         // Must have permission
-        if (!$user->can('cash-in.verify')) {
+        if (!$user->can('cash-out.verify')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -304,17 +282,17 @@ class CashInService
         $action = $request["action"];
 
         // Check if this user is a required verifier for this CashIn
-        $requiredVerifier = $cashIn->requiredVerifiers()
+        $requiredVerifier = $cashOut->requiredVerifiers()
             ->where('user_id', $user->id)
             ->first();
 
 
         if (!$requiredVerifier) {
-            return response()->json(['error' => 'You are not assigned as a verifier for this CashIn'], 403);
+            return response()->json(['error' => 'You are not assigned as a verifier for this CashOut'], 403);
         }
 
         if ($requiredVerifier->verified) {
-            return response()->json(['error' => 'You have already verified this CashIn'], 400);
+            return response()->json(['error' => 'You have already verified this CashOut'], 400);
         }
 
         // Log the verification action
@@ -332,27 +310,27 @@ class CashInService
         ]);
 
         // Check if ALL required verifiers have verified
-        $totalRequired = $cashIn->requiredVerifiers()->count();
-        $totalVerified = $cashIn->requiredVerifiers()->where('verified', true)->count();
+        $totalRequired = $cashOut->requiredVerifiers()->count();
+        $totalVerified = $cashOut->requiredVerifiers()->where('verified', true)->count();
 
         if ($totalVerified === $totalRequired) {
-            $cashIn->verifier_status = 'verified';
-            $cashIn->save();
+            $cashOut->verifier_status = 'verified';
+            $cashOut->save();
         }
 
         // Handle approve/reject (only if user has permission)
         if ($action === 'approve' && $user->can('cash-in.approve')) {
-            $cashIn->status = 'approved';
-            $cashIn->save();
+            $cashOut->status = 'approved';
+            $cashOut->save();
         } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-            $cashIn->status = 'rejected';
-            $cashIn->save();
+            $cashOut->status = 'rejected';
+            $cashOut->save();
         }
 
         return response()->json([
             'message' => ucfirst($action) . ' recorded successfully',
-            'verifier_status' => $cashIn->verifier_status,
-            'status' => $cashIn->status,
+            'verifier_status' => $cashOut->verifier_status,
+            'status' => $cashOut->status,
         ]);
     }
 }

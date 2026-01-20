@@ -6,6 +6,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
@@ -23,7 +25,8 @@ class User extends Authenticatable implements JWTSubject
         'name',
         'email',
         'password',
-        'role'
+        'role',
+        'status'
     ];
 
     /**
@@ -60,5 +63,42 @@ class User extends Authenticatable implements JWTSubject
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name'),
         ];
+    }
+
+    public function getEffectivePermissions()
+    {
+        // Get all permissions from roles
+        $rolePermissionIds = $this->roles
+            ->load('permissions')
+            ->pluck('permissions.*.id')
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        // Get overrides for this user
+        $overrides = DB::table('user_permission_overrides')
+            ->where('user_id', $this->id)
+            ->get()
+            ->keyBy('permission_id');
+
+        // Start with role permissions
+        $effective = $rolePermissionIds;
+
+        // Apply overrides
+        $allPermissions = Permission::pluck('id')->toArray();
+
+        foreach ($allPermissions as $permId) {
+            if (isset($overrides[$permId])) {
+                if ($overrides[$permId]->granted) {
+                    if (!in_array($permId, $effective)) {
+                        $effective[] = $permId;
+                    }
+                } else {
+                    $effective = array_filter($effective, fn($id) => $id !== $permId);
+                }
+            }
+        }
+
+        return $effective;
     }
 }

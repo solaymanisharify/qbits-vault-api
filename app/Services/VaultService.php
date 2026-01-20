@@ -9,22 +9,26 @@ use App\Models\Vault;
 
 class VaultService
 {
-    public function __construct(protected VaultRepository $repository) {}
+    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService) {}
 
     public function getAll(array $filters = [], int $perPage = 15): LengthAwarePaginator|Collection
     {
         return $this->repository->index($filters, $perPage);
     }
 
-    // public function create($data)
-    // {
-    //     $data['vault_id'] = uniqid();
-    //     return $this->repository->create();
-    // }
-
-    public function store(array $data): Vault
+    public function store(array $data)
     {
-        return $this->repository->store($data);
+        $vault = $this->repository->store($data);
+
+        foreach ($data["bags"] as $bag) {
+            $data["vault_id"] = $vault->id;
+            $data["barcode"] = $bag["barcode"];
+            $data["bag_identifier_barcode"] = $bag["bag_identifier_barcode"];
+            $data["rack_number"] = $bag["rack_number"];
+            $data["current_amount"] = $bag["current_amount"];
+
+            $this->vaultBagService->store($data);
+        }
     }
 
     public function show(int $id): ?Vault

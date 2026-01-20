@@ -10,9 +10,10 @@ class VaultRepository
 {
     /**
      * Get all vaults with optional pagination.
-     */ public function index(array $filters = [], ?int $perPage = 15)
+     */
+    public function index(array $filters = [], ?int $perPage = 15)
     {
-        $query = Vault::query()
+        $query = Vault::with('bags')
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('vault_id', 'like', "%{$search}%")
@@ -24,10 +25,14 @@ class VaultRepository
                 $q->where('user_id', $userId)
             )
             ->when($filters['status'] ?? null, function ($q, $status) {
-                // If status is stored as JSON, e.g. status->open
-                $q->whereJsonContains('status->open', filter_var($status, FILTER_VALIDATE_BOOLEAN));
+                $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
+                // Recommended for Laravel 9.19+ (cleaner for booleans)
+                $q->whereJsonPath('status.open', '=', $isOpen);
+
+                // Alternative (works on older versions)
+                // $q->whereJsonContains('status->open', $isOpen);
             })
-            ->latest(); // This replaces orderBy('created_at', 'desc')
+            ->latest();
 
         return $perPage ? $query->paginate($perPage) : $query->get();
     }
@@ -41,7 +46,7 @@ class VaultRepository
     // }
 
     /**
-     * Store a new vault in database.
+     * Store a new vault in database.  
      */
     public function store($data)
     {

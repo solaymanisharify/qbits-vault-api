@@ -3,12 +3,13 @@
 namespace App\Repositories;
 
 use App\Models\CashIn;
+use App\Models\CashOut;
 
-class CashInRepository
+class CashOutRepository
 {
     protected $model;
 
-    public function __construct(CashIn $model)
+    public function __construct(CashOut $model)
     {
         $this->model = $model;
     }
@@ -20,8 +21,8 @@ class CashInRepository
         // === Eager load relationships to avoid N+1 queries ===
         $query->with([
             'user:id,name,email',
-            'vault',
-            'bags',
+            'vault:id,vault_id',
+            'cashOutBags.bag',
             'requiredVerifiers.user',
             'requiredApprovers.user',
             // // 'branch:id,name,code',
@@ -97,7 +98,7 @@ class CashInRepository
 
     public function find($id)
     {
-        return $this->model->with(['requiredVerifiers', 'requiredApprovers', 'vault', 'user'])->findOrFail($id);
+        return $this->model->with(['requiredVerifiers', 'requiredApprovers', 'vault', 'user','cashOutBags.bag'])->findOrFail($id);
     }
 
     public function findByBarcode(string $barcode)
@@ -118,7 +119,7 @@ class CashInRepository
     // Get pending CashIns for a specific verifier (not yet verified by them)
     public function getPendingForVerifier($userId)
     {
-        return CashIn::where('verifier_status', 'pending')
+        return CashOut::where('verifier_status', 'pending')
             ->whereHas('requiredVerifiers', function ($query) use ($userId) {
                 $query->where('user_id', $userId)
                     ->where('verified', false); // hasn't verified yet
@@ -130,7 +131,7 @@ class CashInRepository
     // Get verified CashIns pending approval
     public function getPendingForApprover()
     {
-        return CashIn::where('verifier_status', 'verified')
+        return CashOut::where('verifier_status', 'verified')
             ->where('status', 'pending')
             ->with(['requiredVerifiers', 'requiredApprovers'])
             ->get();

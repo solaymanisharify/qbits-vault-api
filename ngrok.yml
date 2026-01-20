@@ -1,0 +1,15 @@
+version: "2"
+authtoken: 2r3feVfvrxGSWwgzCcWwpyJzd62_2ZRZ9g2QDeu3VTKrbi3fB  # Paste your token here (optional if set globally in Step 2)
+
+tunnels:
+  backend:  # Name this anything
+    proto: http
+    addr: 8000  # Your Laravel port
+    schemes:
+      - https
+
+  frontend:  # Name this anything
+    proto: http
+    addr: 5173  # Your React port
+    schemes:
+      - https

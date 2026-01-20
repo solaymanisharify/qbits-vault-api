@@ -9,8 +9,9 @@ class OrderService
 {
     public function __construct(protected OrderRepository $orderRepository) {}
 
-    public function getOrdersFromQbits()
+    public function getOrdersFromQbits($request)
     {
+
         $result = handleHttpRequest('GET', env('QBITS_SERVICE_BASE_URL') . '/get-orders', [
             'token' => env('QBITS_SERVICE_TOKEN'),
         ], []);
@@ -31,6 +32,8 @@ class OrderService
 
         $data['data'] = $result['data']['data']['orders'];
 
+        info($data['data']);
+
         $updateData = [];
 
         foreach ($data['data'] as $order) {
@@ -42,19 +45,14 @@ class OrderService
                 'payable_amount' => $order['payable_amount'],
                 'paid_amount' => $order['paid_amount'],
                 'total_cash_to_deposit' => $order['total_cash_to_deposit'],
-                // 'payment_status' => $order['payment_status'],
-                // 'order_status' => $order['order_status'],
-                // 'status' => $order['status'],
-                // 'remarks' => $order['remarks'],
             ];
         }
 
 
         $this->orderRepository->upsertOrders($updateData);
-        $data = $this->orderRepository->index();
+        $data = $this->orderRepository->index($request);
 
-        // return $data;
 
-        return successResponse('Orders fetched successfully', $result['data']);
+        return successResponse('Orders fetched successfully', $data, 200);
     }
 }

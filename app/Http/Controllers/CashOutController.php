@@ -2,26 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\CashInService;
+use App\Services\CashOutService;
 use Illuminate\Http\Request;
 
-class CashInController extends Controller
+class CashOutController extends Controller
 {
-    protected $cashInService;
 
-    public function __construct(CashInService $cashInService)
-    {
-        $this->cashInService = $cashInService;
-    }
+    public function __construct(protected CashOutService $cashOutService) {}
 
     public function index()
     {
-        return $this->cashInService->getAll(request()->only('search', 'user_id'));
+        return $this->cashOutService->getAll(request()->only('search', 'user_id'));
     }
 
     public function store(Request $request)
     {
-        return $this->cashInService->createCashIn($request->all());
+        return $this->cashOutService->createCashOut($request->all());
     }
 
     // public function verify(Request $request, $id)
@@ -46,14 +42,14 @@ class CashInController extends Controller
     // List cash-ins for verifiers
     public function listPending()
     {
-        return $this->cashInService->getVerifierAllPendingCashInsByStatus();
+        return $this->cashOutService->getVerifierAllPendingCashOutsByStatus();
     }
     public function verify(Request $request, $id)
     {
-        return $this->cashInService->verify($request->all(), $id);
+        return $this->cashOutService->verify($request->all(), $id);
     }
     public function approved(Request $request, $id)
     {
-        return $this->cashInService->approved($request->all(), $id);
+        return $this->cashOutService->approved($request->all(), $id);
     }
 }

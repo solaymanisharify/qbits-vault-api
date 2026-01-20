@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\VaultBagService;
 use App\Services\VaultService;
 use Illuminate\Http\Request;
 
 class VaultController extends Controller
 {
-    public function __construct(protected VaultService $vaultService) {}
+    public function __construct(protected VaultService $vaultService, protected VaultBagService $vaultBagService) {}
 
     public function index()
     {
@@ -53,5 +54,10 @@ class VaultController extends Controller
         $this->vaultService->delete($id);
 
         return redirect()->route('vaults.index')->with('success', 'Vault deleted!');
+    }
+
+    public function getBag(Request $request, $id)
+    {
+        return $this->vaultBagService->getBagById($request,$id);
     }
 }
