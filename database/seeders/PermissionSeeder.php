@@ -39,6 +39,10 @@ class PermissionSeeder extends Seeder
             'reconciliation.view',
             'reconciliation.create',
             'reconciliation.export',
+            'reconciliation.read',
+            'reconciliation.verify',
+            'reconciliation.approve',
+            'reconciliation.reject',
 
             // Users & Roles
             'user.create',

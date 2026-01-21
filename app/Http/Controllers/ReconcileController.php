@@ -11,13 +11,15 @@ class ReconcileController extends Controller
 
     public function index(Request $request)
     {
-        $data = $this->reconcileService->index($request->all());
-
-        return successResponse("Successfully fetched reconciles", $data, 200);
+        return  $this->reconcileService->index($request->all());
     }
 
-    public function startReconcile(Request $request)
+    public function create(Request $request)
     {
-        return $this->reconcileService->startReconcile($request->all());
+        return $this->reconcileService->create($request->all());
+    }
+    public function listPending()
+    {
+        return $this->reconcileService->getVerifierAllPendingReconcilesByStatus();
     }
 }

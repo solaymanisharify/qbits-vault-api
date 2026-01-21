@@ -13,13 +13,8 @@ return new class extends Migration
     {
         Schema::create('reconciliations', function (Blueprint $table) {
             $table->id();
-
-            // What is being reconciled?
             $table->string('reconcile_tran_id');
-            $table->enum('scope_type', ['vault', 'rack', 'bag'])->nullable(false);
-            $table->unsignedBigInteger('scope_id')->nullable(false); // vault_id / rack_id / bag_id
-
-            // Status management - very important for locking
+            $table->unsignedBigInteger('vault_id')->nullable(false);
             $table->enum('status', [
                 'pending',          // just created, waiting for counter
                 'in_progress',      // counting in progress
@@ -46,23 +41,25 @@ return new class extends Migration
             $table->unsignedBigInteger('completed_by')->nullable();   // who finally approved/closed
 
             // Timing
-            $table->timestamp('started_at')->useCurrent();
-            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('from_date')->useCurrent();
+            $table->timestamp('to_date')->nullable();
             $table->timestamp('expected_completion_at')->nullable();  // deadline
 
             // Additional control
             $table->text('notes')->nullable();                        // general remarks
             $table->text('resolution_reason')->nullable();            // why surplus/shortage happened
-            $table->boolean('requires_escalation')->default(false);   // big variance → needs higher attention
+            $table->boolean('requires_escalation')->default(false);
+            $table->enum('verifier_status', ['pending', 'approved', 'rejected', 'verified'])
+                ->default('pending');
+            $table->enum('approver_status', ['pending', 'approved', 'completed', 'cancelled'])
+                ->default('pending');
 
             // Foreign keys
             $table->foreign('started_by')->references('id')->on('users')->nullOnDelete();
             $table->foreign('completed_by')->references('id')->on('users')->nullOnDelete();
 
             // Important indexes
-            $table->index(['scope_type', 'scope_id']);
             $table->index('status');
-            $table->index('started_at');
 
             $table->timestamps();
             $table->softDeletes();   // ← very useful for reconciliation history

@@ -55,7 +55,8 @@ Route::middleware('auth:api')->group(function () {
 
     // reconcile
     Route::get('/reconciles', [ReconcileController::class, 'index']);
-    Route::post('/reconcile/start', [ReconcileController::class, 'startReconcile']);
+    Route::post('/reconcile', [ReconcileController::class, 'create']);
+    Route::get('/pending/reconciles', [ReconcileController::class, 'listPending']);
 
     //dashboard reports
     Route::get('/dashboard/reports', [DashboardController::class, 'index']);
