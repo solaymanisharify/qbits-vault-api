@@ -11,7 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql
+          ini-values: |
+            memory_limit=512M
+          coverage: none
 
       # Cache Composer Dependencies
       - name: Cache Composer dependencies
