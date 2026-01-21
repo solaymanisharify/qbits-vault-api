@@ -107,7 +107,7 @@ class ReconcileService
         }
 
         return successResponse(
-            "Successfully fetched pending cash-ins",
+            "Successfully fetched pending reconciliations",
             $reconcile->load(['requiredVerifiers.user', 'vault', 'bags']),
             200
         );
