@@ -21,36 +21,45 @@ jobs:
           ini-values: |
             memory_limit=512M
           coverage: none
-
+          
       # Cache Composer Dependencies
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.composer/cache
+          path: vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-composer-
-
+            
+      # Validate Composer files
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+        
       # Install Laravel Dependencies
       - name: Install Dependencies
-        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --quiet
-
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+        
       # Set Correct Environment File
       - name: Set Environment Variables
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "APP_ENV=production" > .env
+            echo "APP_DEBUG=false" >> .env
             echo "DB_DATABASE=${{ secrets.LIVE_DB_DATABASE }}" >> .env
             echo "DB_USERNAME=${{ secrets.LIVE_DB_USERNAME }}" >> .env
             echo "DB_PASSWORD=${{ secrets.LIVE_DB_PASSWORD }}" >> .env
+            echo "DB_HOST=${{ secrets.LIVE_DB_HOST || '127.0.0.1' }}" >> .env
           else
             echo "APP_ENV=development" > .env
+            echo "APP_DEBUG=true" >> .env
             echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
             echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+            echo "DB_HOST=${{ secrets.DB_HOST || '127.0.0.1' }}" >> .env
           fi
+          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
         shell: bash
-
+        
       # Upload Laravel Files to cPanel via FTP
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -62,7 +71,22 @@ jobs:
           server-dir: /
           protocol: ftp
           log-level: verbose
-
-      # Run Laravel Migrations on Both Dev and Main
-      - name: Run Laravel Migrations
-        run: php artisan migrate --force
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/tests/**
+            
+      # Run Laravel Migrations via SSH (FTP can't run commands)
+      # Note: You cannot run artisan commands via FTP - you need SSH access
+      # This step will fail unless you have SSH access to your cPanel
+      # - name: Run Laravel Migrations
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_SSH_HOST || secrets.SSH_HOST }}
+      #     username: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_SSH_USERNAME || secrets.SSH_USERNAME }}
+      #     password: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_SSH_PASSWORD || secrets.SSH_PASSWORD }}
+      #     script: |
+      #       cd /path/to/your/laravel
+      #       php artisan migrate --force
