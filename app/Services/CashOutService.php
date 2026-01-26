@@ -164,7 +164,7 @@ class CashOutService
 
     public function approved($request, $cashOutId)
     {
-        info($request);
+
         $user = auth()->user();
         $cashOut = $this->find($cashOutId);
 
@@ -211,7 +211,7 @@ class CashOutService
 
             $bags = $cashOut->cashOutBags;
 
-            info($bags);
+\
 
             foreach ($bags as $cashOutBag) {
 
@@ -263,11 +263,11 @@ class CashOutService
     }
     public function verify($request, $cashOutId)
     {
-        info($request);
+ 
         $user = auth()->user();
         $cashOut = $this->find($cashOutId);
 
-        info($cashOut);
+
 
         // Must have permission
         if (!$user->can('cash-out.verify')) {

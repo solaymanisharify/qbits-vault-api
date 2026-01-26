@@ -32,7 +32,6 @@ class OrderService
 
         $data['data'] = $result['data']['data']['orders'];
 
-        info($data['data']);
 
         $updateData = [];
 

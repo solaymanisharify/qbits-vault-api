@@ -80,7 +80,6 @@ class UserRepository
 
     public function createUser($request)
     {
-        info($request);
         $currentUser = Auth::user();
 
         $roleData = $request['role'] ?? [];

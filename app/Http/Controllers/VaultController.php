@@ -58,6 +58,10 @@ class VaultController extends Controller
 
     public function getBag(Request $request, $id)
     {
-        return $this->vaultBagService->getBagById($request,$id);
+        return $this->vaultBagService->getBagById($request, $id);
+    }
+    public function getBagByBagId($id)
+    {
+        return $this->vaultBagService->getBagByBagId($id);
     }
 }

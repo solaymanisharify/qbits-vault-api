@@ -15,10 +15,10 @@ class ReconcileRepository
         $query->with([
             'requiredVerifiers.user',
             'requiredApprovers.user',
-            // // 'branch:id,name,code',
-            // 'items' => function ($q) {
-            //     $q->select('id', 'cash_in_id', 'denomination', 'quantity', 'amount');
-            // }
+            'startedBy',
+            'completedBy',
+            'varianceBags',
+            'vault:id,vault_id,name',
         ]);
 
         // === Role-based access control ===
@@ -69,6 +69,15 @@ class ReconcileRepository
             ],
             200
         );
+    }
+
+    public function findById($id)
+    {
+        return Reconciliation::findOrFail($id);
+    }
+    public function getLatestReconcile()
+    {
+        return Reconciliation::latest()->first();
     }
     public function createReconcile($data)
     {

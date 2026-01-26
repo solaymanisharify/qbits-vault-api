@@ -45,7 +45,7 @@ class VaultBagService
 
             // If no amount provided → return all bags (original behavior)
             if (!$amount || !is_numeric($amount) || $amount <= 0) {
-                Log::info('Returning all bags (no amount filter)');
+    
                 return successResponse("Successfully fetched all bags", $bags, 200);
             }
 
@@ -177,5 +177,9 @@ class VaultBagService
     public function update($data, $id)
     {
         return $this->vaultBagRepository->update($data, $id);
+    }
+    public function getBagByBagId($id)
+    {
+        return $this->vaultBagRepository->getBagByBagId($id);
     }
 }

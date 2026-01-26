@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckReconciliationLock;
 use App\Http\Middleware\TokenVerificationMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'auth.api' => TokenVerificationMiddleware::class,
+            'reconcile.lock' => CheckReconciliationLock::class
 
         ]);
     })

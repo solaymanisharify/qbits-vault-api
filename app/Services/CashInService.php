@@ -28,10 +28,12 @@ class CashInService
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
 
-
         return DB::transaction(function () use ($data) {
             $data["tran_id"] = uniqid();
             $cashIn = $this->cashInRepo->create($data);
+
+            // Get the authenticated user ID
+            $authUserId = auth()->id();
 
             // Get users with 'cash-in.verify' permission
             $verifiers = $this->userService->getAllUsersPermissionByName('cash-in.verify');
@@ -39,14 +41,14 @@ class CashInService
             // Get users with 'cash-in.approve' permission
             $approvers = $this->userService->getAllUsersPermissionByName('cash-in.approve');
 
-            // Optional: Exclude super-admin or admin (adjust role/spatie check as per your system)
-            $verifiers = $verifiers->reject(function ($user) {
-                return $user->hasRole(['Super Admin', 'Admin']); // Spatie example
-                // Or if you use a different way: return in_array($user->role, ['super-admin', 'admin']);
+            // Exclude Super Admin, Admin, and the authenticated user from verifiers
+            $verifiers = $verifiers->reject(function ($user) use ($authUserId) {
+                return $user->hasRole(['Super Admin']) || $user->id === $authUserId;
             });
 
-            $approvers = $approvers->reject(function ($user) {
-                return $user->hasRole(['Super Admin', 'Admin']);
+            // Exclude Super Admin, Admin, and the authenticated user from approvers
+            $approvers = $approvers->reject(function ($user) use ($authUserId) {
+                return $user->hasRole(['Super Admin']) || $user->id === $authUserId;
             });
 
             // Create verifier records
@@ -54,7 +56,6 @@ class CashInService
                 $this->cashInRequired->create([
                     'cash_in_id' => $cashIn->id,
                     'user_id'    => $verifier->id,
-                    // 'type'       => 'verifier', // optional: if you have a type column
                 ]);
             }
 
@@ -63,10 +64,7 @@ class CashInService
                 $this->cashInRequired->createApprover([
                     'cash_in_id' => $cashIn->id,
                     'user_id'    => $approver->id,
-                    // 'type'       => 'approver', // optional
                 ]);
-                // Or if you have a separate method/table:
-                // $this->cashInRequired->createApprover([...]);
             }
 
             return successResponse("Successfully created cash-in", [], 200);
@@ -150,7 +148,6 @@ class CashInService
 
     public function approved($request, $cashInId)
     {
-        info($request);
         $user = auth()->user();
         $cashIn = $this->find($cashInId);
 
@@ -172,7 +169,6 @@ class CashInService
             ->where('user_id', $user->id)
             ->first();
 
-        info("approver" . $requiredApprover);
 
         if (!$requiredApprover) {
             return response()->json(['error' => 'You are not assigned as a approver for this CashIn'], 403);
@@ -200,15 +196,12 @@ class CashInService
         $totalRequired = $cashIn->requiredApprovers()->count();
         $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
 
-        info($totalRequired);
-
         if ($totalApproved === $totalRequired) {
 
             $result = handleHttpRequest('POST', env('QBITS_SERVICE_BASE_URL') . '/deposit-orders', [
                 'token' => env('QBITS_SERVICE_TOKEN'),
             ], [$cashIn]);
 
-            info($result);
 
             if ($result['success'] === true) {
                 $cashIn->status = 'approved';
@@ -233,7 +226,7 @@ class CashInService
                         ? json_decode($cashIn->denominations, true)
                         : ($cashIn->denominations ?? []);
 
-                    $bag->denominations = 
+                    $bag->denominations =
                         $mergedDenominations = $oldDenominations;
                     foreach ($newDenominations as $denom => $count) {
                         if (isset($mergedDenominations[$denom])) {
@@ -243,7 +236,6 @@ class CashInService
                         }
                     }
 
-                    info($mergedDenominations);
 
                     $bag->denominations = json_encode($mergedDenominations);
 
@@ -285,11 +277,9 @@ class CashInService
     }
     public function verify($request, $cashInId)
     {
-        info($request);
+
         $user = auth()->user();
         $cashIn = $this->find($cashInId);
-
-        info($cashIn);
 
         // Must have permission
         if (!$user->can('cash-in.verify')) {

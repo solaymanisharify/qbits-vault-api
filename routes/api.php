@@ -49,14 +49,21 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('/permissions', PermissionController::class);
 
     Route::apiResource('vault', VaultController::class);
-    Route::get('/bag/{id}', [VaultController::class, 'getBag']);
+    // Route::get('/bag/{id}', [VaultController::class, 'getBag']);
+    Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);
 
     Route::get('/get-all-orders', [OrderController::class, 'index']);
 
     // reconcile
     Route::get('/reconciles', [ReconcileController::class, 'index']);
+    Route::get('/reconcile/latest', [ReconcileController::class, 'latestReconcile']);
     Route::post('/reconcile', [ReconcileController::class, 'create']);
     Route::get('/pending/reconciles', [ReconcileController::class, 'listPending']);
+    Route::post('/reconcile/verify/{reconcileId}', [ReconcileController::class, 'verify']);
+    Route::post('/reconcile/approve/{reconcileId}', [ReconcileController::class, 'approved']);
+    Route::post('/reconcile/start/{reconcileId}', [ReconcileController::class, 'startReconcile']);
+    Route::get('/reconciliation/check', [ReconcileController::class, 'checkReconcile']);
+    Route::put('/reconciliation/complete/{reconcileId}', [ReconcileController::class, 'completeReconcile']);
 
     //dashboard reports
     Route::get('/dashboard/reports', [DashboardController::class, 'index']);

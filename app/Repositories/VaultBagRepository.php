@@ -24,10 +24,9 @@ class VaultBagRepository
                     $q->where('barcode', 'LIKE', "%{$search}%")
                         ->orWhere('rack_number', 'LIKE', "%{$search}%");
                 });
-
             }
 
-            $result = $query->get(['id', 'barcode', 'denominations','rack_number', 'current_amount']);
+            $result = $query->get(['id', 'barcode', 'denominations', 'rack_number', 'current_amount']);
 
             return $result;
         } catch (\Exception $e) {
@@ -42,5 +41,9 @@ class VaultBagRepository
     public function update($data, $id)
     {
         return VaultBag::where('id', $id)->update($data);
+    }
+    public function getBagByBagId($id)
+    {
+        return VaultBag::find($id);
     }
 }

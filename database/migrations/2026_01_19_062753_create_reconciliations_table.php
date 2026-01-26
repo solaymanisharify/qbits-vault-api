@@ -34,6 +34,7 @@ return new class extends Migration
             $table->decimal('expected_balance', 15, 2)->nullable();   // what system expected
             $table->decimal('counted_balance', 15, 2)->nullable();    // final physical count total
             $table->decimal('variance', 15, 2)->nullable();           // counted - expected (can be negative)
+            $table->json('variances_bags')->nullable();           // counted - expected (can be negative)
             $table->enum('variance_type', ['shortage', 'surplus', 'matched', 'unknown'])->nullable();
 
             // People involved
