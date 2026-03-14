@@ -10,42 +10,69 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class VaultRepository
 {
-    /**
-     * Get all vaults with optional pagination.
-     */
-    public function index(array $filters = [], ?int $perPage = 15)
-    {
-        $query = Vault::with('bags')
-            ->when($filters['search'] ?? null, function ($q, $search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('vault_id', 'like', "%{$search}%")
-                    ->orWhere('address', 'like', "%{$search}%");
-            })
-            ->when(
-                $filters['user_id'] ?? null,
-                fn($q, $userId) =>
-                $q->where('user_id', $userId)
-            )
-            ->when($filters['status'] ?? null, function ($q, $status) {
-                $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
-                // Recommended for Laravel 9.19+ (cleaner for booleans)
-                $q->whereJsonPath('status.open', '=', $isOpen);
+    // public function index(array $filters = [], ?int $perPage = 15)
+    // {
+    //     $query = Vault::with('bags')
+    //         ->when($filters['search'] ?? null, function ($q, $search) {
+    //             $q->where('name', 'like', "%{$search}%")
+    //                 ->orWhere('vault_id', 'like', "%{$search}%")
+    //                 ->orWhere('address', 'like', "%{$search}%");
+    //         })
+    //         ->when(
+    //             $filters['user_id'] ?? null,
+    //             fn($q, $userId) =>
+    //             $q->where('user_id', $userId)
+    //         )
+    //         ->when($filters['status'] ?? null, function ($q, $status) {
+    //             $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
+    //             $q->whereJsonPath('status.open', '=', $isOpen);
+    //         })
+    //         ->latest();
 
-                // Alternative (works on older versions)
-                // $q->whereJsonContains('status->open', $isOpen);
+    //     return $perPage ? $query->paginate($perPage) : $query->get();
+    // }
+
+
+    public function index(array $filters = [], int $perPage = 15)
+    {
+        $sortBy  = in_array($filters['sort_by'] ?? '', ['name', 'balance', 'created_at', 'total_bags'])
+            ? $filters['sort_by']
+            : 'created_at';
+        $sortDir = ($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        $query = Vault::query()
+            ->select([
+                'id',
+                'vault_id',
+                'name',
+                'address',
+                'balance',
+                'total_racks',
+                'total_bags',
+                'last_cash_in',
+                'last_cash_out',
+                'status',
+                'created_at',
+            ])
+            ->withCount('bags')
+            ->with(['bags:id,vault_id,barcode,bag_identifier_barcode,rack_number,current_amount,is_active,is_sealed'])
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                // Wrap in a grouped where so OR doesn't bleed into other clauses
+                $q->where(function ($q2) use ($search) {
+                    $q2->where('name',     'like', "%{$search}%")
+                        ->orWhere('vault_id', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%");
+                });
             })
-            ->latest();
+            ->when($filters['user_id'] ?? null, fn($q, $id) => $q->where('user_id', $id))
+            ->when($filters['status']  ?? null, function ($q, $status) {
+                $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
+                $q->whereJsonPath('status.open', '=', $isOpen);
+            })
+            ->orderBy($sortBy, $sortDir);
 
         return $perPage ? $query->paginate($perPage) : $query->get();
     }
-
-    /**
-     * Create a new vault record (returns the model with form data, usually for "create" view).
-     */
-    // public function create(): Vault
-    // {
-    //     return new Vault();
-    // }
 
     /**
      * Store a new vault in database.  

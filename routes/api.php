@@ -50,6 +50,7 @@ Route::middleware('auth:api')->group(function () {
     //permissions
     Route::apiResource('/permissions', PermissionController::class);
 
+    // vault
     Route::apiResource('vault', VaultController::class);
     Route::get('/vault/bag/{vaultId}', [VaultController::class, 'getBag']);
     Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);

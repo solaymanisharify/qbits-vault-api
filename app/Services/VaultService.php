@@ -11,8 +11,10 @@ class VaultService
 {
     public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService) {}
 
-    public function getAll(array $filters = [], int $perPage = 15): LengthAwarePaginator|Collection
+    public function getAll(array $filters = [])
     {
+        $perPage = min((int) ($filters['per_page'] ?? 15), 100);
+
         return $this->repository->index($filters, $perPage);
     }
 

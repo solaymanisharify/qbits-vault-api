@@ -10,11 +10,11 @@ class VaultController extends Controller
 {
     public function __construct(protected VaultService $vaultService, protected VaultBagService $vaultBagService) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        $vaults = $this->vaultService->getAll(request()->only('search', 'user_id'));
+        $filters = $request->only('search', 'user_id', 'status', 'sort_by', 'sort_dir', 'per_page');
 
-        return $vaults;
+        return $this->vaultService->getAll($filters);
     }
 
     public function store(Request $request)
