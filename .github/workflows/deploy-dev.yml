@@ -63,7 +63,6 @@ jobs:
           username: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_FTP_USERNAME || secrets.FTP_USERNAME }}
           password: ${{ github.ref == 'refs/heads/main' && secrets.LIVE_FTP_PASSWORD || secrets.FTP_PASSWORD }}
           local-dir: ./
-          server-dir: /
           protocol: ftp
           log-level: verbose
           exclude: |
