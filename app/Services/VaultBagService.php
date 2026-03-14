@@ -13,6 +13,10 @@ class VaultBagService
     {
         return $this->vaultBagRepository->store($data);
     }
+    public function findVaultbagWithTrashedByBagId($data)
+    {
+        return $this->vaultBagRepository->findVaultbagWithTrashedByBagId($data);
+    }
 
     public function getBagById($request, $id)
     {

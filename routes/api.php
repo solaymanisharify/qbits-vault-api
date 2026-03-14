@@ -25,13 +25,22 @@ Route::controller(AuthController::class)->group(function () {
 });
 
 Route::middleware('auth:api')->group(function () {
-    Route::get('users', [UserController::class, 'index']);
-    Route::get('user/{id}', [UserController::class, 'show']);
-    Route::put('user/{id}', [UserController::class, 'update']);
-    Route::post('users', [UserController::class, 'create']);
-    Route::post('users/{userId}/assign-role', [UserController::class, 'assignRole']);
-    Route::post('users/{userId}/assign-permission', [UserController::class, 'assignPermission']);
-    Route::post('users/change-password/{userId}', [AuthController::class, 'changePassword']);
+
+    // User
+    Route::prefix('users')->group(function () {
+
+        Route::get('/',    [UserController::class, 'index']);
+        Route::post('/',   [UserController::class, 'create']);
+
+        Route::get('/{userId}',    [UserController::class, 'show']);
+        Route::put('/{userId}',    [UserController::class, 'update']);
+        Route::delete('/{userId}', [UserController::class, 'destroy']);
+        Route::post('/change-password/{userId}', [AuthController::class, 'changePassword']);
+        Route::post('/{userId}/assign-role', [UserController::class, 'assignRole']);
+        Route::post('/{userId}/assign-permission', [UserController::class, 'assignPermission']);
+
+        // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
+    });
 
     // cashin
     Route::apiResource('/cash-in', CashInController::class);

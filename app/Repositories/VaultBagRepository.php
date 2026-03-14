@@ -11,6 +11,10 @@ class VaultBagRepository
     {
         return VaultBag::create($data);
     }
+    public function findVaultbagWithTrashedByBagId($bagId)
+    {
+        return VaultBag::withTrashed()->findOrFail($bagId);
+    }
 
     public function getBagById($id, $search = null)
     {

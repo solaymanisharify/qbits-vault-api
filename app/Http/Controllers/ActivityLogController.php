@@ -4,25 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Services\ActivityLoggerService;
+use App\Services\VaultBagService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class ActivityLogController extends Controller
 {
-    /**
-     * GET /api/activity-logs
-     *
-     * Query params:
-     *   module        string   filter by module (vault, bag, transaction…)
-     *   event         string   filter by event  (created, updated, deleted…)
-     *   subject_type  string   e.g. App\Models\VaultBag
-     *   subject_id    int
-     *   user_id       int
-     *   search        string   searches description + subject_label + user_name
-     *   from          date     YYYY-MM-DD
-     *   to            date     YYYY-MM-DD
-     *   per_page      int      default 25
-     */
+    public function __construct(protected VaultBagService $vaultBagService, protected ActivityLoggerService $cashInService) {}
     public function index(Request $request): JsonResponse
     {
 
@@ -71,13 +59,9 @@ class ActivityLogController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/activity-logs/for-bag/{bagId}
-     * Returns the internal per-bag history array stored in vault_bags.history
-     */
     public function BagHistory(int $bagId): JsonResponse
     {
-        $bag = \App\Models\VaultBag::withTrashed()->findOrFail($bagId);
+        $bag = $this->vaultBagService->findVaultbagWithTrashedByBagId($bagId);
 
         $history = collect($bag->history ?? [])
             ->sortByDesc('timestamp')

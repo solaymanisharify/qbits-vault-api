@@ -5,33 +5,9 @@ namespace App\Repositories;
 use App\Models\Vault;
 use App\Models\VaultBag;
 use App\Services\ActivityLoggerService;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class VaultRepository
 {
-    // public function index(array $filters = [], ?int $perPage = 15)
-    // {
-    //     $query = Vault::with('bags')
-    //         ->when($filters['search'] ?? null, function ($q, $search) {
-    //             $q->where('name', 'like', "%{$search}%")
-    //                 ->orWhere('vault_id', 'like', "%{$search}%")
-    //                 ->orWhere('address', 'like', "%{$search}%");
-    //         })
-    //         ->when(
-    //             $filters['user_id'] ?? null,
-    //             fn($q, $userId) =>
-    //             $q->where('user_id', $userId)
-    //         )
-    //         ->when($filters['status'] ?? null, function ($q, $status) {
-    //             $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
-    //             $q->whereJsonPath('status.open', '=', $isOpen);
-    //         })
-    //         ->latest();
-
-    //     return $perPage ? $query->paginate($perPage) : $query->get();
-    // }
-
 
     public function index(array $filters = [], int $perPage = 15)
     {

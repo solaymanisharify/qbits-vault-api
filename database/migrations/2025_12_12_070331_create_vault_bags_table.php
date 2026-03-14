@@ -58,6 +58,7 @@ return new class extends Migration
             $table->index('barcode');
             $table->index('is_active');
             $table->index('last_cash_in_at');
+            $table->index(['current_amount'], 'idx_bags_vault');
         });
     }
 

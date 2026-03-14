@@ -24,8 +24,12 @@ return new class extends Migration
             $table->json('verifiers')->nullable();
             $table->json('status')->nullable();
             $table->timestamps();
+
+            $table->index(['name', 'vault_id', 'address'], 'idx_vaults_list');
         });
     }
+
+
 
     /**
      * Reverse the migrations.
