@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes; // Optional, if you want soft dele
 
 class VaultBag extends Model
 {
-    use HasFactory;
+    use HasFactory , SoftDeletes;
     // use SoftDeletes; // Uncomment if you add softDeletes() in migration
 
     protected $table = 'vault_bags';
@@ -100,15 +100,36 @@ class VaultBag extends Model
     /**
      * Optional: Append a log entry to history (JSON array)
      */
-    public function addHistoryLog(array $log)
-    {
-        $history = $this->history ?? [];
+    // public function addHistoryLog(array $log)
+    // {
+    //     $history = $this->history ?? [];
 
-        $history[] = array_merge($log, [
-            'timestamp' => now()->toDateTimeString(),
-        ]);
+    //     $history[] = array_merge($log, [
+    //         'timestamp' => now()->toDateTimeString(),
+    //     ]);
+
+    //     $this->history = $history;
+    //     $this->save();
+    // }
+
+    public function appendHistory(string $event, string $description, array $data = []): void
+    {
+        $history   = $this->history ?? [];
+        $history[] = [
+            'event'       => $event,
+            'description' => $description,
+            'data'        => $data,
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()?->name ?? 'System',
+            'timestamp'   => now()->toIso8601String(),
+        ];
+
+        // Cap at 200 entries per bag so JSON doesn't bloat
+        if (count($history) > 200) {
+            $history = array_slice($history, -200);
+        }
 
         $this->history = $history;
-        $this->save();
+        $this->saveQuietly(); // skip model events to avoid recursion
     }
 }

@@ -8,6 +8,12 @@ class CashInRequiredVerifier extends Model
 {
     protected $fillable = ['cash_in_id', 'user_id', 'verified', 'verified_at'];
 
+    protected $casts = [
+        'verified' => 'boolean',
+        'verified_at' => 'datetime',
+    ];
+
+
     public function cashIn()
     {
         return $this->belongsTo(CashIn::class);

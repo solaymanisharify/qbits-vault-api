@@ -48,6 +48,9 @@ return new class extends Migration
             $table->string('status')->nullable(); // Optional: store full history log as JSON
             // Example history entry: [{"action": "cash_in", "amount": 50000, "by": 3, "at": "2025-12-17 10:00:00", "tran_id": "ABC123"}, ...]
 
+            $table->softDeletes();                        // deleted_at column
+            $table->string('deleted_reason')->nullable();
+
             $table->timestamps();
 
             // Indexes for performance

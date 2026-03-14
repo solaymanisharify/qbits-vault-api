@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CashInController;
 use App\Http\Controllers\CashOutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReconcileController;
@@ -49,7 +51,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('/permissions', PermissionController::class);
 
     Route::apiResource('vault', VaultController::class);
-    // Route::get('/bag/{id}', [VaultController::class, 'getBag']);
+    Route::get('/vault/bag/{vaultId}', [VaultController::class, 'getBag']);
     Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);
 
     Route::get('/get-all-orders', [OrderController::class, 'index']);
@@ -67,4 +69,15 @@ Route::middleware('auth:api')->group(function () {
 
     //dashboard reports
     Route::get('/dashboard/reports', [DashboardController::class, 'index']);
+
+    // ledger data
+    Route::get('/cash-in/{id}/ledger', [LedgerController::class, 'getLedgerData']);
+
+    // Activity Logs
+    // make group route here
+    Route::group(['prefix' => 'activity-logs'], function () {
+        Route::get('/', [ActivityLogController::class, 'index']);
+        Route::get('bag/{id}', [ActivityLogController::class, 'BagHistory']);
+        Route::post('custom', [ActivityLogController::class, 'custom']);
+    });
 });

@@ -20,6 +20,8 @@ class VaultService
     {
         $vault = $this->repository->store($data);
 
+        $vaultBalance = 0;
+
         foreach ($data["bags"] as $bag) {
             $data["vault_id"] = $vault->id;
             $data["barcode"] = $bag["barcode"];
@@ -28,12 +30,19 @@ class VaultService
             $data["current_amount"] = $bag["current_amount"];
 
             $this->vaultBagService->store($data);
+
+            $vaultBalance += $bag["current_amount"];
         }
+
+        $data["balance"] = $vaultBalance;
+        $this->repository->update($vault->id, $data);
     }
 
-    public function show(int $id): ?Vault
+    public function show(int $id)
     {
-        return $this->repository->show($id);
+        $vault = $this->repository->show($id);
+
+        return successResponse("Successfully fetch vault", $vault, 200);
     }
 
     public function edit(int $id): Vault
@@ -41,7 +50,7 @@ class VaultService
         return $this->repository->edit($id);
     }
 
-    public function update(int $id, array $data): bool
+    public function update(int $id, array $data)
     {
         // Business logic before/after update if needed
         return $this->repository->update($id, $data);
@@ -52,5 +61,4 @@ class VaultService
         // You could dispatch events, soft-delete related data, etc.
         return $this->repository->destroy($id);
     }
-
 }

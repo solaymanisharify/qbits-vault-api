@@ -3,6 +3,8 @@
 namespace App\Repositories;
 
 use App\Models\Vault;
+use App\Models\VaultBag;
+use App\Services\ActivityLoggerService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -58,7 +60,7 @@ class VaultRepository
      */
     public function show(int $id): ?Vault
     {
-        return Vault::findOrFail($id);
+        return Vault::with('bags')->findOrFail($id);
     }
 
     /**
@@ -72,13 +74,200 @@ class VaultRepository
     /**
      * Update an existing vault.
      */
-    public function update(int $id, array $data): bool
+    // public function update(int $id, array $data): bool
+    // {
+    //     $vault = Vault::findOrFail($id);
+
+    //     // Separate bags from vault fields
+    //     $bags    = $data['bags'] ?? [];
+    //     $vaultData = collect($data)->except(['bags'])->toArray();
+
+    //     // Update vault core fields
+    //     $updated = $vault->update($vaultData);
+
+    //     // Handle bags — update existing, create new
+    //     if (!empty($bags)) {
+    //         foreach ($bags as $bagData) {
+    //             $existingBag = VaultBag::where('vault_id', $vault->id)
+    //                 ->where('barcode', $bagData['barcode'])
+    //                 ->first();
+
+    //             if ($existingBag) {
+    //                 // Update existing bag
+    //                 $existingBag->update([
+    //                     'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? $existingBag->bag_identifier_barcode,
+    //                     'rack_number'            => $bagData['rack_number'] ?? $existingBag->rack_number,
+    //                     'current_amount'         => $bagData['current_amount'] ?? $existingBag->current_amount,
+    //                 ]);
+    //             } else {
+    //                 // Create new bag
+    //                 VaultBag::create([
+    //                     'vault_id'               => $vault->id,
+    //                     'barcode'                => $bagData['barcode'],
+    //                     'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? null,
+    //                     'rack_number'            => $bagData['rack_number'] ?? null,
+    //                     'current_amount'         => $bagData['current_amount'] ?? 0,
+    //                     'is_active'              => true,
+    //                     'is_sealed'              => false,
+    //                 ]);
+    //             }
+    //         }
+
+    //         // Recalculate vault totals from all its bags
+    //         $vault->refresh();
+    //         $totalAmount = $vault->bags()->sum('current_amount');
+    //         $totalBags   = $vault->bags()->count();
+
+    //         $vault->update([
+    //             'balance'    => $totalAmount,
+    //             'total_bags' => $totalBags,
+    //         ]);
+    //     }
+
+    //     return $updated;
+    // }
+
+    public function update(int $id, array $data): array
     {
-        $vault = Vault::findOrFail($id);
+        $vault    = Vault::findOrFail($id);
+        $oldSnap  = $vault->toArray();
 
-        return $vault->update($data);
+        // ── 1. Separate bags payload from vault fields ────────────────────────
+        $incomingBags = $data['bags'] ?? [];
+        $vaultData    = collect($data)->except(['bags'])->toArray();
+
+        // ── 2. Update vault core fields ───────────────────────────────────────
+        $vault->update($vaultData);
+
+        $deletedBarcodes = [];
+        $errors          = [];
+
+        if (!empty($incomingBags)) {
+            $incomingBarcodes = collect($incomingBags)->pluck('barcode')->toArray();
+
+            // ── 3. Find bags that exist in DB but are missing in payload ──────
+            $existingBags = VaultBag::where('vault_id', $vault->id)->get();
+
+            foreach ($existingBags as $existingBag) {
+                if (!in_array($existingBag->barcode, $incomingBarcodes)) {
+                    // Guard: cannot delete if bag has a non-zero amount
+                    if ((float) $existingBag->current_amount > 0) {
+                        $errors[] = [
+                            'barcode' => $existingBag->barcode,
+                            'message' => "Bag {$existingBag->barcode} has ৳{$existingBag->current_amount} — zero the amount before deleting.",
+                        ];
+                        continue;
+                    }
+
+                    // Safe to soft-delete
+                    $existingBag->appendHistory('deleted', "Bag removed from vault during vault update", [
+                        'vault_id'   => $vault->id,
+                        'vault_name' => $vault->name,
+                    ]);
+
+                    $existingBag->update(['is_active' => false, 'deleted_reason' => 'Removed during vault update']);
+                    $existingBag->delete(); // soft delete
+
+                    ActivityLoggerService::deleted(
+                        $existingBag,
+                        'bag',
+                        $existingBag->barcode,
+                        'Removed during vault update',
+                        ['vault_id' => $vault->id, 'vault_name' => $vault->name]
+                    );
+
+                    $deletedBarcodes[] = $existingBag->barcode;
+                }
+            }
+
+            // ── 4. Upsert incoming bags ───────────────────────────────────────
+            foreach ($incomingBags as $bagData) {
+                $existingBag = VaultBag::where('vault_id', $vault->id)
+                    ->where('barcode', $bagData['barcode'])
+                    ->first();
+
+                if ($existingBag) {
+                    // --- Update existing bag ---
+                    $oldBagSnap = $existingBag->toArray();
+
+                    $changes = [];
+                    $updatePayload = [];
+
+                    foreach (['bag_identifier_barcode', 'rack_number', 'current_amount'] as $field) {
+                        if (isset($bagData[$field]) && (string) $existingBag->$field !== (string) $bagData[$field]) {
+                            $changes[$field] = ['from' => $existingBag->$field, 'to' => $bagData[$field]];
+                            $updatePayload[$field] = $bagData[$field];
+                        }
+                    }
+
+                    if (!empty($updatePayload)) {
+                        $existingBag->update($updatePayload);
+
+                        $existingBag->appendHistory('updated', 'Bag fields updated', ['changes' => $changes]);
+
+                        ActivityLoggerService::updated(
+                            $existingBag,
+                            'bag',
+                            $existingBag->barcode,
+                            $oldBagSnap,
+                            $existingBag->fresh()->toArray(),
+                            ['vault_id' => $vault->id]
+                        );
+                    }
+                } else {
+                    // --- Create new bag ---
+                    $newBag = VaultBag::create([
+                        'vault_id'               => $vault->id,
+                        'barcode'                => $bagData['barcode'],
+                        'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? null,
+                        'rack_number'            => $bagData['rack_number'] ?? null,
+                        'current_amount'         => $bagData['current_amount'] ?? 0,
+                        'is_active'              => true,
+                        'is_sealed'              => false,
+                    ]);
+
+                    $newBag->appendHistory('created', 'Bag created and added to vault', [
+                        'vault_id'   => $vault->id,
+                        'vault_name' => $vault->name,
+                    ]);
+
+                    ActivityLoggerService::created(
+                        $newBag,
+                        'bag',
+                        $newBag->barcode,
+                        $newBag->toArray(),
+                        ['vault_id' => $vault->id]
+                    );
+                }
+            }
+        }
+
+        // ── 5. Recalculate vault totals ───────────────────────────────────────
+        $vault->refresh();
+        $totalAmount = $vault->bags()->sum('current_amount');
+        $totalBags   = $vault->bags()->count();
+
+        $vault->update([
+            'balance'    => $totalAmount,
+            'total_bags' => $totalBags,
+        ]);
+
+        // ── 6. Log vault update ───────────────────────────────────────────────
+        ActivityLoggerService::updated(
+            $vault,
+            'vault',
+            $vault->name,
+            $oldSnap,
+            $vault->fresh()->toArray(),
+            ['bags_deleted' => $deletedBarcodes]
+        );
+
+        return [
+            'success'         => empty($errors),
+            'errors'          => $errors,           // non-deleted bags with amounts
+            'deleted_barcodes' => $deletedBarcodes,
+        ];
     }
-
     /**
      * Delete a vault.
      */

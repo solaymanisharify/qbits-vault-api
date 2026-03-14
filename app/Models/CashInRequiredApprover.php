@@ -14,6 +14,11 @@ class CashInRequiredApprover extends Model
         'approved_at',
     ];
 
+    protected $casts = [
+        'approved' => 'boolean',
+        'approved_at' => 'datetime',
+    ];
+
     public function cashIn()
     {
         return $this->belongsTo(CashIn::class);
