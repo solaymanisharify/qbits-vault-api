@@ -211,8 +211,6 @@ class CashOutService
 
             $bags = $cashOut->cashOutBags;
 
-\
-
             foreach ($bags as $cashOutBag) {
 
                 $bag = $cashOutBag->bag;
