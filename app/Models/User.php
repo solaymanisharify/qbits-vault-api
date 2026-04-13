@@ -65,6 +65,23 @@ class User extends Authenticatable implements JWTSubject
         ];
     }
 
+    public function vaultAssignments()
+    {
+        return $this->hasMany(VaultAssign::class);
+    }
+
+    public function vaults()
+    {
+        return $this->hasManyThrough(
+            Vault::class,
+            VaultAssign::class,
+            'user_id',
+            'id',
+            'id',
+            'vault_id'
+        );
+    }
+
     public function getEffectivePermissions()
     {
         // Get all permissions from roles

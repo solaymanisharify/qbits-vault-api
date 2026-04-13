@@ -38,6 +38,15 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/change-password/{userId}', [AuthController::class, 'changePassword']);
         Route::post('/{userId}/assign-role', [UserController::class, 'assignRole']);
         Route::post('/{userId}/assign-permission', [UserController::class, 'assignPermission']);
+        Route::put('/{userId}/update-permissions', [UserController::class, 'UpdatePermission']);
+        Route::post('/{user}/vaults/toggle', [UserController::class, 'toggleVault']);
+        Route::put('/{userId}/vaults/{vaultId}/roles', [UserController::class, 'updateVaultRoles']);
+
+        Route::put('/{userId}/toggle-status', [UserController::class, 'toggleStatus']);
+        Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
+        Route::post('/{userId}/reset-password', [UserController::class, 'resetPassword']);
+        // Public route — no auth middleware
+        Route::post('/reset-password/confirm', [UserController::class, 'confirmResetPassword']);
 
         // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
     });
@@ -49,6 +58,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/approve/cash-in/{cashInId}', [CashInController::class, 'approved']);
     // role
     Route::apiResource('/roles', RoleController::class);
+
 
     // cashout
     Route::apiResource('/cash-out', CashOutController::class);

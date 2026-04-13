@@ -7,7 +7,12 @@ use App\Repositories\PermissionRepository;
 class PermissionService
 {
 
-    public function __construct(protected PermissionRepository $permissionRepository, protected RoleService $roleService) {}
+    public function __construct(
+        protected PermissionRepository $permissionRepository,
+        protected RoleService $roleService,
+        protected UserService $userService
+
+    ) {}
 
     public function permissions()
     {
@@ -17,15 +22,11 @@ class PermissionService
     {
         return $this->permissionRepository->getUserPermissions($id);
     }
-    public function update($request, $id)
+    public function UpdatePermission($permissions, $userId)
     {
-        $ids = is_array($id) ? $id : [$id];
+        $user = $this->userService->findById($userId);
 
-        $roles = $this->roleService->find($ids);
-
-        $roles->each(function ($role) use ($request) {
-            $role->syncPermissions($request['permissions']);
-        });
+        $user->syncPermissions($permissions ?? []);
 
         return response()->json(['message' => 'Permissions updated successfully']);
     }

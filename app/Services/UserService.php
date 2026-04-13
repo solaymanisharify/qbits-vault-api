@@ -7,6 +7,10 @@ use App\Repositories\UserRepository;
 class UserService
 {
     public function __construct(protected UserRepository $userRepository) {}
+    public function findById($id)
+    {
+        return $this->userRepository->findById($id);
+    }
     public function index($request = null)
     {
         $users = $this->userRepository->index($request);
@@ -27,13 +31,6 @@ class UserService
 
     public function createUser($request)
     {
-        // $request->validate([
-        //     'name' => 'required',
-        //     'email' => 'required|email|unique:users',
-        //     'password' => 'required|min:8',
-        //     'role' => 'required|in:admin,user', // Super can't create super
-        // ]);
-
         return $this->userRepository->createUser($request);
     }
 
