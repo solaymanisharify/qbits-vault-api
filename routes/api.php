@@ -9,12 +9,11 @@ use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReconcileController;
-use App\Http\Controllers\RoleAndPermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VaultController;
 use Illuminate\Support\Facades\Route;
-use Spatie\Permission\Models\Role;
+
 
 // auth routes
 Route::controller(AuthController::class)->group(function () {
@@ -22,6 +21,7 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('login', 'login');
     Route::post('logout', 'logout');
     Route::post('refresh', 'refresh');
+    Route::post('/email/verify', 'verifyEmail');
 });
 
 Route::middleware('auth:api')->group(function () {
@@ -39,10 +39,10 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{userId}/assign-role', [UserController::class, 'assignRole']);
         Route::post('/{userId}/assign-permission', [UserController::class, 'assignPermission']);
         Route::put('/{userId}/update-permissions', [UserController::class, 'UpdatePermission']);
-        Route::post('/{user}/vaults/toggle', [UserController::class, 'toggleVault']);
+        Route::post('/{user}/vaults/toggle', [UserController::class, 'toggleVaultAssign']);
         Route::put('/{userId}/vaults/{vaultId}/roles', [UserController::class, 'updateVaultRoles']);
 
-        Route::put('/{userId}/toggle-status', [UserController::class, 'toggleStatus']);
+        Route::put('/{userId}/toggle-status', [UserController::class, 'toggleUserStatus']);
         Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
         Route::post('/{userId}/reset-password', [UserController::class, 'resetPassword']);
         // Public route — no auth middleware

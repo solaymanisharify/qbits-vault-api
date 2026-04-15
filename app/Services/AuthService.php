@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class AuthService
 {
-    public function __construct(protected UserRepository $userRepository) {}
+    public function __construct(protected UserRepository $userRepository, protected UserService $userService) {}
 
     public function create($request)
     {
@@ -42,11 +43,7 @@ class AuthService
 
         $token = Auth::attempt($credentials);
         if (!$token) {
-
             return errorResponse("Invalid credentials", [], 401);
-            // return response()->json([
-            //     'message' => 'Unauthorized',
-            // ], 401);
         }
 
         $user = Auth::user();
@@ -55,6 +52,11 @@ class AuthService
             'user' => $user,
             'access_token' => $token,
         ];
+
+        if ($user->status === 'inactive') {
+            $this->userService->notVerifiedUserEmailVerification($user);
+        }
+
 
         return successResponse("Successfully logged in", $authResponse, 200);
     }

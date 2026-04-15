@@ -15,7 +15,7 @@ class UserRepository
     public function __construct(protected RoleService $roleService) {}
     public function index($request = null)
     {
-        $query = User::with('roles', 'permissions','vaultAssignments')->orderBy('created_at', 'desc');;
+        $query = User::with('roles', 'permissions', 'vaultAssignments')->orderBy('created_at', 'desc');;
 
         // Search functionality
         $search = null;
@@ -52,7 +52,7 @@ class UserRepository
 
     public function show($id)
     {
-        $user = User::with(['roles.permissions', 'permissions','vaultAssignments'])->findOrFail($id); // Load roles and direct permissions
+        $user = User::with(['roles.permissions', 'permissions', 'vaultAssignments'])->findOrFail($id); // Load roles and direct permissions
 
         $effectivePermissions = $user->getEffectivePermissions();
 
@@ -157,16 +157,15 @@ class UserRepository
         $roles = $this->roleService->find($roleData);
 
         if ($roles->isEmpty()) {
-            return response()->json([
-                'error' => 'Invalid roles provided'
-            ], 422);
+            return response()->json(['error' => 'Invalid roles provided'], 422);
         }
 
         // Authorization check
         if ($currentUser->hasRole('Admin')) {
-            $hasRestrictedRole = $roles->contains(function ($role) {
-                return in_array($role->name, ['Super Admin', 'super_admin']);
-            });
+            $hasRestrictedRole = $roles->contains(
+                fn($role) =>
+                in_array($role->name, ['Super Admin', 'super_admin'])
+            );
 
             if ($hasRestrictedRole) {
                 return response()->json([
@@ -175,21 +174,30 @@ class UserRepository
             }
         }
 
-        // Handle Profile Image Upload
+        // ====================== FIXED IMAGE HANDLING ======================
         $imagePath = null;
-        if ($request->hasFile('profile_image') || $request->hasFile('avatar')) {
-            $image = $request->file('profile_image') ?? $request->file('avatar');
 
-            $imagePath = $image->store('users/profile', 'public'); // stores in storage/app/public/users/profile
+        // Support both Request object and Array input
+        if (is_object($request) && method_exists($request, 'hasFile')) {
+            // $request is Illuminate\Http\Request
+            if ($request->hasFile('profile_image')) {
+                $imagePath = $request->file('profile_image')->store('users/profile', 'public');
+            } elseif ($request->hasFile('avatar')) {
+                $imagePath = $request->file('avatar')->store('users/profile', 'public');
+            }
+        } elseif (is_array($request)) {
+            // $request is array (most likely from $request->all() or validated data)
+            // Files are usually not present in array, but we keep the check for future
+            // If you're sending file via FormData, controller should pass full $request
         }
 
         // Create User
         $newUser = User::create([
-            'name'          => $request["name"],
-            'email'         => $request["email"],
-            'password'      => bcrypt($request["password"]),
-            'img' => $imagePath,        // ← Added
-            'status'        => $request['status'] ?? 'active',
+            'name'     => $request['name'] ?? null,
+            'email'    => $request['email'] ?? null,
+            'password' => bcrypt($request['password'] ?? ''),
+            'img'      => $imagePath,
+            'status'   => $request['status'] ?? 'active',
         ]);
 
         // Assign Roles

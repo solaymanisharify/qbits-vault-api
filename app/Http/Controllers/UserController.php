@@ -4,19 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PermissionRequest;
 use Illuminate\Http\Request;
-use App\Models\User;
 use App\Models\VaultAssign;
 use App\Services\PermissionService;
 use App\Services\UserService;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
+use App\Services\VaultAssignService;
 use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
     public function __construct(
         protected UserService $userService,
-        protected PermissionService $permissionService
+        protected PermissionService $permissionService,
+        protected VaultAssignService $vaultAssignService
     ) {}
 
     public function index(Request $request)
@@ -36,7 +35,7 @@ class UserController extends Controller
     public function assignRole(Request $request, $userId)
     {
         $authUser = Auth::user();
-        $targetUser = User::findOrFail($userId);
+        $targetUser = $this->userService->findById($userId);
 
         if (!$authUser->can('assign-role')) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -54,7 +53,7 @@ class UserController extends Controller
     public function assignPermission(Request $request, $userId)
     {
         $authUser = Auth::user();
-        $targetUser = User::findOrFail($userId);
+        $targetUser = $this->userService->findById($userId);
 
         if (!$authUser->can('assign-permission')) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -84,52 +83,56 @@ class UserController extends Controller
 
     public function attachVault(Request $request, $userId)
     {
-        $user = User::findOrFail($userId);
+        $user = $this->userService->findById($userId);
         $user->vaults()->attach($request->vault_id);
     }
 
-    public function toggleVault(Request $request, $userId)
+    public function toggleVaultAssign(Request $request, $userId)
     {
         $request->validate([
             'vault_id' => 'required|exists:vaults,id',
         ]);
 
-        $vaultId = $request->vault_id;
+        return $this->vaultAssignService->toggleVaultAssign($request, $userId);
 
-        $existing = VaultAssign::where('user_id', $userId)
-            ->where('vault_id', $vaultId)
-            ->first();
+        // $vaultId = $request->vault_id;
 
-        if ($existing) {
-            // Toggle status
-            $newStatus = $existing->status === 'active' ? 'inactive' : 'active';
+        // $existing = VaultAssign::where('user_id', $userId)
+        //     ->where('vault_id', $vaultId)
+        //     ->first();
 
-            $existing->update([
-                'status' => $newStatus
-            ]);
+        // if ($existing) {
+        //     // Toggle status
+        //     $newStatus = $existing->status === 'active' ? 'inactive' : 'active';
 
-            return response()->json([
-                'message' => $newStatus === 'active'
-                    ? 'Vault assigned successfully'
-                    : 'Vault deactivated successfully',
-                'action'  => $newStatus,
-                'status'  => $newStatus
-            ]);
-        } else {
-            // Create new assignment with active status
-            VaultAssign::create([
-                'user_id'  => $userId,
-                'vault_id' => $vaultId,
-                'roles'    => [],
-                'status'   => 'active'        // Default active
-            ]);
+        //     $existing->update([
+        //         'status' => $newStatus
+        //     ]);
 
-            return response()->json([
-                'message' => 'Vault assigned successfully',
-                'action'  => 'assigned',
-                'status'  => 'active'
-            ]);
-        }
+        //     return response()->json([
+        //         'message' => $newStatus === 'active'
+        //             ? 'Vault assigned successfully'
+        //             : 'Vault deactivated successfully',
+        //         'action'  => $newStatus,
+        //         'status'  => $newStatus
+        //     ]);
+        // } else {
+        //     // Create new assignment with active status
+        //     VaultAssign::create([
+        //         'user_id'  => $userId,
+        //         'vault_id' => $vaultId,
+        //         'roles'    => [],
+        //         'status'   => 'active'        // Default active
+        //     ]);
+
+        //     return response()->json([
+        //         'message' => 'Vault assigned successfully',
+        //         'action'  => 'assigned',
+        //         'status'  => 'active'
+        //     ]);
+        // }
+
+
     }
 
     public function updateVaultRoles(Request $request, $userId, $vaultId)
@@ -145,7 +148,7 @@ class UserController extends Controller
         // $vaultId = $request->vault_id;
         $roles   = $request->roles; // array of role names e.g. ['admin', 'editor']
 
-        $user = User::findOrFail($userId);
+        $user = $this->userService->findById($userId);
 
 
 
@@ -199,49 +202,19 @@ class UserController extends Controller
         ]);
     }
 
-    public function toggleStatus($userId)
+    public function toggleUserStatus($userId)
     {
-        $user = User::findOrFail($userId);
-        $user->status = $user->status === 'inactive' ? 'active' : 'inactive';
-        $user->save();
-
-        return response()->json([
-            'message' => 'User status updated',
-            'status'  => $user->status
-        ]);
+        return $this->userService->toggleUserStatus($userId);
     }
 
     public function archiveUser($userId)
     {
-        $user = User::findOrFail($userId);
-        $user->status = 'archived';
-        $user->save();
-
-        return response()->json([
-            'message' => 'User archived',
-            'status'  => 'archived'
-        ]);
+        return $this->userService->archiveUser($userId);
     }
 
     public function resetPassword($userId)
     {
-        $user = User::findOrFail($userId);
-
-        // Generate token — store in password_reset_tokens table
-        $token = \Illuminate\Support\Str::random(64);
-
-        \DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user->email],
-            [
-                'token'      => hash('sha256', $token),
-                'created_at' => now()
-            ]
-        );
-
-        // Send email
-        \Mail::to($user->email)->send(new \App\Mail\PasswordResetMail($user, $token));
-
-        return response()->json(['message' => 'Password reset email sent']);
+        return $this->userService->resetPassword($userId);
     }
 
     public function confirmResetPassword(Request $request)
@@ -252,27 +225,6 @@ class UserController extends Controller
             'password' => 'required|min:8|confirmed',
         ]);
 
-        $record = \DB::table('password_reset_tokens')
-            ->where('email', $request->email)
-            ->first();
-
-        // Direct token comparison — no hashing
-        if (!$record || $record->token !== $request->token) {
-            return response()->json(['message' => 'Invalid token'], 422);
-        }
-
-        if (now()->diffInMinutes($record->created_at) > 60) {
-            return response()->json(['message' => 'Token expired'], 422);
-        }
-
-        $user = User::where('email', $request->email)->firstOrFail();
-
-        // Direct bcrypt — no Hash facade (JWT compatible)
-        $user->password = bcrypt($request->password);
-        $user->save();
-
-        \DB::table('password_reset_tokens')->where('email', $request->email)->delete();
-
-        return response()->json(['message' => 'Password reset successfully']);
+        return $this->userService->confirmResetPassword($request);
     }
 }

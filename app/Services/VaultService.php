@@ -63,4 +63,5 @@ class VaultService
         // You could dispatch events, soft-delete related data, etc.
         return $this->repository->destroy($id);
     }
+   
 }
