@@ -53,7 +53,7 @@ class AuthService
             'access_token' => $token,
         ];
 
-        if ($user->status === 'inactive') {
+        if (!$user->verified && !$user->email_verified_at) {
             $this->userService->notVerifiedUserEmailVerification($user);
         }
 
