@@ -22,6 +22,9 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('logout', 'logout');
     Route::post('refresh', 'refresh');
     Route::post('/email/verify', 'verifyEmail');
+    Route::post('/phone/verify', 'verifyPhoneOtp');
+    Route::post('/phone/send-otp', 'sendOtpToPhone');
+    Route::post('/user/verification', 'userVerifcation');
 });
 
 Route::middleware('auth:api')->group(function () {
@@ -47,6 +50,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{userId}/reset-password', [UserController::class, 'resetPassword']);
         // Public route — no auth middleware
         Route::post('/reset-password/confirm', [UserController::class, 'confirmResetPassword']);
+
+        Route::get('/{id}/download-id', [UserController::class, 'downloadId']);
 
         // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
     });

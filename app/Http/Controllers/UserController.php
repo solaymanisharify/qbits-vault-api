@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PermissionRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Models\VaultAssign;
 use App\Services\PermissionService;
 use App\Services\UserService;
 use App\Services\VaultAssignService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
@@ -226,5 +228,40 @@ class UserController extends Controller
         ]);
 
         return $this->userService->confirmResetPassword($request);
+    }
+
+
+    public function downloadId($id)
+    {
+        $user = User::with('roles', 'vaultAssignments')->findOrFail($id);
+
+        // Convert images to base64 directly from storage
+        $profileImg = $this->imageToBase64($user->img);
+        $nidFront   = $this->imageToBase64($user->nid_front_img);
+        $nidBack    = $this->imageToBase64($user->nid_back_img);
+
+        $pdf = Pdf::loadView('pdf.user-id', [
+            'user'       => $user,
+            'profileImg' => $profileImg,
+            'nidFront'   => $nidFront,
+            'nidBack'    => $nidBack,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("{$user->name}_Identity_Report.pdf");
+    }
+
+    private function imageToBase64($path)
+    {
+        if (!$path) return null;
+
+        // Strip full URL if stored as full URL
+        $relativePath = str_replace(config('app.url') . '/storage/', '', $path);
+        $fullPath = storage_path('app/public/' . $relativePath);
+
+        if (!file_exists($fullPath)) return null;
+
+        $mime = mime_content_type($fullPath);
+        $data = base64_encode(file_get_contents($fullPath));
+        return "data:{$mime};base64,{$data}";
     }
 }

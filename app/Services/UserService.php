@@ -42,6 +42,10 @@ class UserService
     {
         return $this->userRepository->update($request, $id);
     }
+    public function userVerifcation($request, $id)
+    {
+        return $this->userRepository->userVerifcation($request, $id);
+    }
 
     public function toggleUserStatus($userId)
     {
@@ -117,6 +121,32 @@ class UserService
             ->where('used', false)
             ->delete();
 
-        Mail::to($user->email)->send(new InactiveUserEmailVerification($user));
+        $otp = rand(100000, 999999); // 6 digit OTP
+
+        Otp::create([
+            'user_id'    => $user->id,
+            'otp'        => $otp,
+            'purpose'    => 'email_verification',
+            'expires_at' => now()->addMinutes(15),
+        ]);
+
+        $data = [
+            'module_name' => 'email_verification',
+            "recipients" => [
+                [
+                    'email' => $user->email,
+                ]
+            ],
+            'dynamic_data' => [
+                'email' => $user->email,
+                'otp' => $otp,
+            ],
+
+        ];
+
+
+        handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
+
+        // Mail::to($user->email)->send(new InactiveUserEmailVerification($user));
     }
 }

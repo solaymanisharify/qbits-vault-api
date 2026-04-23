@@ -29,7 +29,20 @@ class User extends Authenticatable implements JWTSubject
         'phone_verified_at',
         'email_verified_at',
         'role',
-        'status'
+        'current_address',
+        'current_division',
+        'current_district',
+        'current_thana',
+        'permanent_address',
+        'permanent_division',
+        'permanent_district',
+        'permanent_thana',
+        'verified',
+        'status',
+        'kyc_verified_at',
+        'img',
+        'nid_front_image',
+        'nid_back_image',
     ];
 
     /**

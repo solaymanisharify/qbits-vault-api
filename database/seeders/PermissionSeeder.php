@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Spatie\Permission\Models\Role;
 
 class PermissionSeeder extends Seeder
 {
@@ -77,6 +78,9 @@ class PermissionSeeder extends Seeder
 
         // Assign ALL permissions directly to the user (User-wise)
         $superAdminUser->syncPermissions(Permission::all());
+
+        $superAdminRole = Role::firstOrCreate(['name' => 'super-admin']);
+        $superAdminUser->assignRole($superAdminRole);
 
         // Optional: You can create more users with specific permissions here
         // Example:
