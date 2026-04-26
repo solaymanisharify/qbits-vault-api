@@ -41,8 +41,8 @@ class User extends Authenticatable implements JWTSubject
         'status',
         'kyc_verified_at',
         'img',
-        'nid_front_image',
-        'nid_back_image',
+        'nid_front_img',
+        'nid_back_img',
     ];
 
     /**

@@ -30,8 +30,8 @@ return new class extends Migration
             $table->boolean('verified')->default(false);
             $table->enum('status', ['active', 'inactive', 'archived'])->default('inactive');
             $table->string('img')->nullable();
-            $table->string('nid_front_image')->nullable();
-            $table->string('nid_back_image')->nullable();
+            $table->string('nid_front_img')->nullable();
+            $table->string('nid_back_img')->nullable();
             $table->timestamp('kyc_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
