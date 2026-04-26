@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Otp;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\AuthService;
 use App\Services\UserService;
@@ -272,10 +273,27 @@ class AuthController extends Controller
     public function sendOtpToPhone(Request $request)
     {
         $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{7,15}$/'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{7,15}$/',],
         ]);
 
         $user = auth()->user();
+
+        // Check if phone already exists on another account
+        $phoneExists = User::where('phone', $request->phone)
+            ->where('id', '!=', $user->id)
+            ->exists();
+
+        if ($phoneExists) {
+            return response()->json([
+                'message' => 'This phone number is already associated with another account.',
+            ], 409); // 409 Conflict
+        }
+
+        if ($user->phone === $request->phone && $user->phone_verified_at) {
+            return response()->json([
+                'message' => 'This phone number is already verified on your account.',
+            ], 409);
+        }
 
         // Invalidate any existing unused OTPs for this user/purpose
         Otp::where('user_id', $user->id)
@@ -332,5 +350,4 @@ class AuthController extends Controller
     {
         $this->userService->userVerifcation($request->all(), auth()->user()->id);
     }
-
 }

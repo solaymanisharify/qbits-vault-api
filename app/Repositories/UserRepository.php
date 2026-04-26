@@ -464,8 +464,8 @@ class UserRepository
         $fileFields = [
             'img'           => 'img',
             'avatar'        => 'img',
-            'nid_front_img' => 'nid_front_img',
-            'nid_back_img'  => 'nid_back_img',
+            'nid_front_image' => 'nid_front_img',
+            'nid_back_image'  => 'nid_back_img',
         ];
 
         $hasUploaded = false;

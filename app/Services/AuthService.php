@@ -49,7 +49,7 @@ class AuthService
         $user = Auth::user();
 
 
-        if (!$user->hasRole('super-admin') && $user->status === 'inactive') {
+        if (!$user->hasRole('super-admin') && $user->status === 'inactive' && $user->verified) {
             Auth::logout();
             return errorResponse("Your account is inactive. Please contact support.", [], 403);
         }
