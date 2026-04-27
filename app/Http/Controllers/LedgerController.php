@@ -174,7 +174,7 @@ class LedgerController extends Controller
                     'closing_balance' => $closingBalance,
                     'ledger_rows' => $ledgerRows,
                     'vault' => [
-                        'vault_id' => $vault->vault_id,
+                        'vault_code' => $vault->vault_code,
                         'current_balance' => $vault->balance,
                     ],
                     'status' => $cashIn->status,

@@ -19,7 +19,7 @@ class VaultRepository
         $query = Vault::query()
             ->select([
                 'id',
-                'vault_id',
+                'vault_code',
                 'name',
                 'address',
                 'balance',
@@ -36,7 +36,7 @@ class VaultRepository
                 // Wrap in a grouped where so OR doesn't bleed into other clauses
                 $q->where(function ($q2) use ($search) {
                     $q2->where('name',     'like', "%{$search}%")
-                        ->orWhere('vault_id', 'like', "%{$search}%")
+                        ->orWhere('vault_code', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             })

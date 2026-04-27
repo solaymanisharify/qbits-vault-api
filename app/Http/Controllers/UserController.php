@@ -197,7 +197,7 @@ class UserController extends Controller
 
         return response()->json([
             'message'       => 'Vault roles updated successfully',
-            'vault_id'      => $vaultId,
+            'vault_code'      => $vaultId,
             'updated_roles' => $roles,
             'added'         => array_values($rolesToAdd),
             'removed'       => array_values($rolesToRemove),

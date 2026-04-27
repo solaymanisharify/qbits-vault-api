@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\SoftDeletes; // Optional, if you want soft dele
 class VaultBag extends Model
 {
     use HasFactory , SoftDeletes;
-    // use SoftDeletes; // Uncomment if you add softDeletes() in migration
 
     protected $table = 'vault_bags';
 

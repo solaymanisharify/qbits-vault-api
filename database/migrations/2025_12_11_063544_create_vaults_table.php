@@ -13,10 +13,11 @@ return new class extends Migration
     {
         Schema::create('vaults', function (Blueprint $table) {
             $table->id();
-            $table->string('vault_id');
+            $table->string('vault_code')->unique();
             $table->string('name');
             $table->string('address')->nullable();
             $table->string('balance')->default(0);
+            $table->decimal('limit', 15, 2)->default(200000.00);
             $table->string('total_racks')->nullable();
             $table->json('total_bags')->nullable();
             $table->json('last_cash_in')->nullable();
@@ -25,7 +26,7 @@ return new class extends Migration
             $table->json('status')->nullable();
             $table->timestamps();
 
-            $table->index(['name', 'vault_id', 'address'], 'idx_vaults_list');
+            $table->index(['name', 'vault_code', 'address'], 'idx_vaults_list');
         });
     }
 
