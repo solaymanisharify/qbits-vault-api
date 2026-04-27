@@ -19,7 +19,7 @@ class Vault extends Model
         'last_cash_out',
         'verifiers',
         'status',
-        'limit',
+        'bag_balance_limit',
     ];
 
     protected $casts = [
