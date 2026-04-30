@@ -42,7 +42,9 @@ class UserRepository
 
         $users = $query->paginate($perPage);
 
+    
         return $users;
+
     }
 
     public function findById(int $id)

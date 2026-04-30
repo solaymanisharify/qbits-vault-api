@@ -43,6 +43,7 @@ class User extends Authenticatable implements JWTSubject
         'img',
         'nid_front_img',
         'nid_back_img',
+        'default_vault_id',
     ];
 
     /**

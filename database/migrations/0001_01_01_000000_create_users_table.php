@@ -32,6 +32,7 @@ return new class extends Migration
             $table->string('img')->nullable();
             $table->string('nid_front_img')->nullable();
             $table->string('nid_back_img')->nullable();
+            $table->foreignId('default_vault_id')->nullable()->constrained('vaults')->nullOnDelete();
             $table->timestamp('kyc_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();

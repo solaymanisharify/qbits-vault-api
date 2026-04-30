@@ -22,7 +22,7 @@ return new class extends Migration
             $table->json('denominations')->nullable();
             $table->enum('verifier_status', ['pending', 'approved', 'rejected', 'verified'])
                 ->default('pending');
-            $table->enum('status', ['pending', 'approved', 'completed', 'cancelled'])
+            $table->enum('approver_status', ['pending', 'approved', 'completed', 'cancelled'])
                 ->default('pending');
             $table->timestamps();
 

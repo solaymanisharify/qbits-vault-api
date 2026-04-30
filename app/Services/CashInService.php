@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\VaultAssign;
+use App\Models\VaultBag;
 use App\Repositories\CashInRepository;
 use App\Repositories\CashInRequiredRepository;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
+use Illuminate\Support\Str;
 
 
 class CashInService
@@ -24,51 +28,160 @@ class CashInService
 
     public function createCashIn(array $data)
     {
+        info($data);
+
+
         $data["user_id"] = auth()->id();
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
 
-        return DB::transaction(function () use ($data) {
-            $data["tran_id"] = uniqid();
+        $authUserId = auth()->user();
+
+        $vaultId = $authUserId->default_vault_id;
+        $data["vault_id"] = $vaultId;
+        $cashInAmount = $data['cash_in_amount'];
+
+        $bagAmountLimit = 200000;
+
+
+
+        // calculation which bag is suitable for the cash-in amount
+
+        $bag = VaultBag::where('vault_id', $vaultId)
+            ->where('is_active', true)
+            ->whereRaw('(current_amount + ?) <= ?', [$cashInAmount, $bagAmountLimit])
+            ->where('current_amount', '>', 0)
+            ->orderBy('current_amount', 'asc')
+            ->first();
+
+        if (!$bag) {
+            $bag = VaultBag::where('vault_id', $vaultId)
+                ->where('is_active', true)
+                ->where('current_amount', 0)
+                ->first();
+        }
+
+        if (!$bag) {
+
+            $role = $authUserId->roles->contains(function ($role) {
+                return strtolower($role->name) === 'bag create';
+            });
+
+            return errorResponse(
+                [
+                    'message' => 'No bag available for cash-in',
+                    'role' => $role,
+                    'vault_id' => $vaultId,
+                ],
+                [],
+                500
+            );
+        }
+
+        $data['bag_id'] = $bag->id;
+
+
+        return DB::transaction(function () use ($data, $vaultId) {
+            $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
+
             $cashIn = $this->cashInRepo->create($data);
 
             // Get the authenticated user ID
-            $authUserId = auth()->id();
 
-            // Get users with 'cash-in.verify' permission
-            $verifiers = $this->userService->getAllUsersPermissionByName('cash-in.verify');
 
-            // Get users with 'cash-in.approve' permission
-            $approvers = $this->userService->getAllUsersPermissionByName('cash-in.approve');
+            $verifierRoleIds = Role::where('name', 'verifier')->pluck('id');
+            $approverRoleIds = Role::where('name', 'approver')->pluck('id');
 
-            // Exclude Super Admin, Admin, and the authenticated user from verifiers
-            $verifiers = $verifiers->reject(function ($user) use ($authUserId) {
-                return $user->hasRole(['Super Admin']) || $user->id === $authUserId;
-            });
 
-            // Exclude Super Admin, Admin, and the authenticated user from approvers
-            $approvers = $approvers->reject(function ($user) use ($authUserId) {
-                return $user->hasRole(['Super Admin']) || $user->id === $authUserId;
-            });
+
+
+
+            // find the users who are verifier and approver and assign to the cash-in
+            if ($vaultId) {
+                // 3. Query VaultAssign for this vault AND matching roles in the JSON column
+                $verifierUserIds = VaultAssign::where('vault_id', $vaultId)
+                    ->where('status', 'active')
+                    ->where(function ($query) use ($verifierRoleIds) {
+                        foreach ($verifierRoleIds as $roleId) {
+                            $query->orWhereJsonContains('roles', $roleId);
+                        }
+                    })
+                    ->pluck('user_id');
+
+                $approverUserIds = VaultAssign::where('vault_id', $vaultId)
+                    ->where('status', 'active')
+                    ->where(function ($query) use ($approverRoleIds) {
+                        foreach ($approverRoleIds as $roleId) {
+                            $query->orWhereJsonContains('roles', $roleId);
+                        }
+                    })
+                    ->pluck('user_id');
+
+                info("Matching User IDs: " . $approverUserIds->implode(', '));
+            }
 
             // Create verifier records
-            foreach ($verifiers as $verifier) {
+            foreach ($verifierUserIds as $verifier) {
                 $this->cashInRequired->create([
                     'cash_in_id' => $cashIn->id,
-                    'user_id'    => $verifier->id,
+                    'user_id'    => $verifier,
                 ]);
             }
 
             // Create approver records
-            foreach ($approvers as $approver) {
+            foreach ($approverUserIds as $approver) {
                 $this->cashInRequired->createApprover([
                     'cash_in_id' => $cashIn->id,
-                    'user_id'    => $approver->id,
+                    'user_id'    => $approver,
                 ]);
             }
 
-            return successResponse("Successfully created cash-in", [], 200);
+            return successResponse("Successfully created cash-in", $cashIn, 200);
         });
+    }
+
+
+    public function updateCashIn($data, $id)
+    {
+        $cashIn = $this->find($id);
+
+        if (!$cashIn) {
+            return errorResponse("Cash-in not found", [], 404);
+        }
+
+        // Only allow update if status is still pending
+        if ($cashIn->verifier_status !== 'pending' || $cashIn->approver_status !== 'pending') {
+            return errorResponse("Only pending cash-ins can be updated", [], 400);
+        }
+
+        $newDenominations = $data['denominations'] ?? null;
+
+        if ($newDenominations) {
+            $existing = $cashIn->denominations; // already cast to array via $casts
+
+            if (!empty($existing)) {
+                $merged = $existing;
+                foreach ($newDenominations as $note => $count) {
+                    $merged[$note] = ($merged[$note] ?? 0) + $count;
+                }
+            } else {
+                $merged = $newDenominations;
+            }
+
+            $data['denominations'] = $merged;
+        }
+
+        // Update allowed fields
+        $allowedFields = ['cash_in_amount', 'denominations'];
+        $updateData = array_intersect_key($data, array_flip($allowedFields));
+
+        if (empty($updateData)) {
+            return errorResponse("No valid fields to update", [], 400);
+        }
+
+        $this->cashInRepo->update($id, $updateData);
+
+        return successResponse("Successfully updated cash-in", [], 200);
     }
     // public function getVerifierAllPendingCashInsByStatus()
     // {

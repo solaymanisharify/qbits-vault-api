@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class CashIn extends Model
 {
-    protected $fillable = ['user_id', 'tran_id', 'vault_id', 'orders', 'bag_id', 'cash_in_amount', 'denominations', 'verifier_status', 'status'];
+    protected $fillable = ['user_id', 'tran_id', 'vault_id', 'orders', 'bag_id', 'cash_in_amount', 'denominations', 'verifier_status', 'approver_status'];
 
     protected $casts = [
         'denominations' => 'array',

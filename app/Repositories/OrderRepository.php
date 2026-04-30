@@ -2,7 +2,9 @@
 
 namespace App\Repositories;
 
+use App\Models\CashIn;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 
 class OrderRepository
 {
@@ -29,17 +31,26 @@ class OrderRepository
     {
         $perPage = $request->integer('per_page', 10);
         $search  = $request->input('search');
-        $excludeOrderIds = $request->input('exclude_order_ids');
 
+        // Get order_ids that already exist in cashIns table
+        $excludeOrderIds = DB::table('cash_ins')
+            ->whereNotNull('orders')
+            ->pluck('orders')
+            ->map(fn($item) => collect(json_decode($item, true))->pluck('order_id'))
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->toArray();
 
         $query = Order::query();
 
-        if ($excludeOrderIds !== null && is_array($excludeOrderIds) && count($excludeOrderIds) > 0) {
+        // Exclude orders that already have a cash-in
+        if (!empty($excludeOrderIds)) {
             $query->whereNotIn('order_id', $excludeOrderIds);
         }
 
-        // Apply search filter if search term exists
-        if ($search !== null && trim($search) !== '') {
+        // Apply search filter
+        if (!empty(trim($search ?? ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('order_id', 'like', "%{$search}%")
                     ->orWhere('customer_name', 'like', "%{$search}%")
@@ -47,32 +58,26 @@ class OrderRepository
             });
         }
 
-        // Order by latest
-        $query->latest('created_at');
+        $orders = $query->latest('created_at')->paginate($perPage);
 
-        // Paginate results
-        $orders = $query->paginate($perPage);
-        // Append search params to pagination links (only if request exists)
         $orders->appends([
             'search'   => $search,
             'per_page' => $perPage,
-            'exclude_order_ids' => $excludeOrderIds,
         ]);
 
-        $new = [
+        return [
             'orders' => $orders->items(),
             'pagination' => [
-                'current_page'   => $orders->currentPage(),
-                'per_page'       => $orders->perPage(),
-                'total'          => $orders->total(),
-                'last_page'      => $orders->lastPage(),
-                'from'           => $orders->firstItem(),
-                'to'             => $orders->lastItem(),
-                'next_page_url'  => $orders->nextPageUrl(),
-                'prev_page_url'  => $orders->previousPageUrl(),
-                'links'          => $orders->linkCollection()->toArray()
-            ]
+                'current_page'  => $orders->currentPage(),
+                'per_page'      => $orders->perPage(),
+                'total'         => $orders->total(),
+                'last_page'     => $orders->lastPage(),
+                'from'          => $orders->firstItem(),
+                'to'            => $orders->lastItem(),
+                'next_page_url' => $orders->nextPageUrl(),
+                'prev_page_url' => $orders->previousPageUrl(),
+                'links'         => $orders->linkCollection()->toArray(),
+            ],
         ];
-        return $new;
     }
 }

@@ -23,6 +23,10 @@ class CashInController extends Controller
     {
         return $this->cashInService->createCashIn($request->all());
     }
+    public function update(Request $request, $id)
+    {
+        return $this->cashInService->updateCashIn($request->all(), $id);
+    }
 
     // public function verify(Request $request, $id)
     // {
