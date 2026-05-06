@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Vault;
+use App\Services\VaultBagRequestService;
 use App\Services\VaultBagService;
 use App\Services\VaultService;
 use Illuminate\Http\Request;
 
 class VaultController extends Controller
 {
-    public function __construct(protected VaultService $vaultService, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected VaultService $vaultService, protected VaultBagService $vaultBagService, protected VaultBagRequestService $vaultBagRequestService) {}
 
     public function index(Request $request)
     {
@@ -52,5 +54,9 @@ class VaultController extends Controller
     public function getBagByBagId($id)
     {
         return $this->vaultBagService->getBagByBagId($id);
+    }
+    public function createBagRequest(Request $request)
+    {
+        return $this->vaultBagRequestService->createBagRequest($request->all());
     }
 }

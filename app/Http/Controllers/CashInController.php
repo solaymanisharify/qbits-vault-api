@@ -19,6 +19,12 @@ class CashInController extends Controller
         return $this->cashInService->getAll(request()->only('search', 'user_id'));
     }
 
+
+    public function show($id)
+    {
+        return $this->cashInService->find($id);
+    }
+
     public function store(Request $request)
     {
         return $this->cashInService->createCashIn($request->all());
@@ -26,6 +32,10 @@ class CashInController extends Controller
     public function update(Request $request, $id)
     {
         return $this->cashInService->updateCashIn($request->all(), $id);
+    }
+    public function destroy($id)
+    {
+        return $this->cashInService->deleteCashIn($id);
     }
 
     // public function verify(Request $request, $id)

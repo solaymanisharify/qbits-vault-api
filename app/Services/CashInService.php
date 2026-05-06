@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CashIn;
 use App\Models\VaultAssign;
 use App\Models\VaultBag;
 use App\Repositories\CashInRepository;
@@ -21,6 +22,7 @@ class CashInService
         return  $this->cashInRepo->getAll(request()->only('search', 'user_id'));
     }
 
+
     public function find($id)
     {
         return $this->cashInRepo->find($id);
@@ -28,38 +30,100 @@ class CashInService
 
     public function createCashIn(array $data)
     {
-        info($data);
+
+        $orderIds = collect($data['orders'])->pluck('order_id');
+
+        $existingOrders = CashIn::where(function ($query) use ($orderIds) {
+            foreach ($orderIds as $orderId) {
+                $query->orWhereJsonContains('orders', ['order_id' => $orderId]);
+            }
+        })->pluck('orders');
+
+        $duplicates = $existingOrders
+            ->flatten(1)
+            ->pluck('order_id')
+            ->intersect($orderIds)
+            ->values();
+
+        if ($duplicates->isNotEmpty()) {
+            return errorResponse(
+                ['message' => 'Orders ' . $duplicates->implode(', ') . ' are already linked to a cash-in'],
+                [],
+                500
+            );
+        }
 
 
         $data["user_id"] = auth()->id();
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
+        $vaultId = $data['vault_id'];
 
         $authUserId = auth()->user();
 
-        $vaultId = $authUserId->default_vault_id;
-        $data["vault_id"] = $vaultId;
+        // $data["vault_id"] = $vaultId;
         $cashInAmount = $data['cash_in_amount'];
 
         $bagAmountLimit = 200000;
 
+        $roles = Role::whereIn('name', ['verifier', 'approver'])->get()->keyBy('name');
 
+
+
+        $verifierRole = $roles->get('verifier');
+        $approverRole = $roles->get('approver');
+
+        if (!$verifierRole || !$approverRole) {
+            $message = match (true) {
+                !$verifierRole && !$approverRole => 'Verifier and approver roles not found',
+                !$verifierRole                   => 'Verifier role not found',
+                !$approverRole                   => 'Approver role not found',
+            };
+
+            return errorResponse(['message' => $message], [
+                'verifier_role' => (bool) $verifierRole,
+                'approver_role' => (bool) $approverRole,
+                'role_status' => false,
+            ], 500);
+        }
+
+        if ($vaultId) {
+
+            $assignments = VaultAssign::where('vault_id', $vaultId)
+                ->where('status', 'active')
+                ->get(['user_id', 'roles']);
+
+
+            $verifierUserIds = $assignments
+                ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+            $approverUserIds = $assignments
+                ->filter(fn($a) => in_array($approverRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+
+            if ($verifierUserIds->isEmpty() || $approverUserIds->isEmpty()) {
+                $message = match (true) {
+                    $verifierUserIds->isEmpty() && $approverUserIds->isEmpty() => 'Verifier and approver not found for this vault',
+                    $verifierUserIds->isEmpty()                                => 'Verifier not found for this vault',
+                    $approverUserIds->isEmpty()                                => 'Approver not found for this vault',
+                };
+
+                return errorResponse(['message' => $message], [
+                    'verifier_found' => !$verifierUserIds->isEmpty(),
+                    'approver_found' => !$approverUserIds->isEmpty(),
+                    'role_status'    => false,
+                ], 500);
+            }
+        }
 
         // calculation which bag is suitable for the cash-in amount
-
         $bag = VaultBag::where('vault_id', $vaultId)
             ->where('is_active', true)
-            ->whereRaw('(current_amount + ?) <= ?', [$cashInAmount, $bagAmountLimit])
-            ->where('current_amount', '>', 0)
-            ->orderBy('current_amount', 'asc')
+            ->where('current_amount', 0)
             ->first();
 
-        if (!$bag) {
-            $bag = VaultBag::where('vault_id', $vaultId)
-                ->where('is_active', true)
-                ->where('current_amount', 0)
-                ->first();
-        }
 
         if (!$bag) {
 
@@ -70,7 +134,7 @@ class CashInService
             return errorResponse(
                 [
                     'message' => 'No bag available for cash-in',
-                    'role' => $role,
+                    'bag_create_role' => $role,
                     'vault_id' => $vaultId,
                 ],
                 [],
@@ -81,44 +145,10 @@ class CashInService
         $data['bag_id'] = $bag->id;
 
 
-        return DB::transaction(function () use ($data, $vaultId) {
+        return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds) {
             $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
-
-            $cashIn = $this->cashInRepo->create($data);
-
-            // Get the authenticated user ID
-
-
-            $verifierRoleIds = Role::where('name', 'verifier')->pluck('id');
-            $approverRoleIds = Role::where('name', 'approver')->pluck('id');
-
-
-
-
-
             // find the users who are verifier and approver and assign to the cash-in
-            if ($vaultId) {
-                // 3. Query VaultAssign for this vault AND matching roles in the JSON column
-                $verifierUserIds = VaultAssign::where('vault_id', $vaultId)
-                    ->where('status', 'active')
-                    ->where(function ($query) use ($verifierRoleIds) {
-                        foreach ($verifierRoleIds as $roleId) {
-                            $query->orWhereJsonContains('roles', $roleId);
-                        }
-                    })
-                    ->pluck('user_id');
-
-                $approverUserIds = VaultAssign::where('vault_id', $vaultId)
-                    ->where('status', 'active')
-                    ->where(function ($query) use ($approverRoleIds) {
-                        foreach ($approverRoleIds as $roleId) {
-                            $query->orWhereJsonContains('roles', $roleId);
-                        }
-                    })
-                    ->pluck('user_id');
-
-                info("Matching User IDs: " . $approverUserIds->implode(', '));
-            }
+            $cashIn = $this->cashInRepo->create($data);
 
             // Create verifier records
             foreach ($verifierUserIds as $verifier) {
@@ -140,7 +170,6 @@ class CashInService
         });
     }
 
-
     public function updateCashIn($data, $id)
     {
         $cashIn = $this->find($id);
@@ -149,41 +178,84 @@ class CashInService
             return errorResponse("Cash-in not found", [], 404);
         }
 
-        // Only allow update if status is still pending
         if ($cashIn->verifier_status !== 'pending' || $cashIn->approver_status !== 'pending') {
             return errorResponse("Only pending cash-ins can be updated", [], 400);
         }
 
-        $newDenominations = $data['denominations'] ?? null;
+        // --- Validate duplicate order_ids for newly added orders only ---
+        $addedOrders     = $data['added_orders'] ?? [];
+        $removedOrderIds = $data['removed_order_ids'] ?? [];
 
-        if ($newDenominations) {
-            $existing = $cashIn->denominations; // already cast to array via $casts
+        if (!empty($addedOrders)) {
+            $addedOrderIds = collect($addedOrders)->pluck('order_id');
 
-            if (!empty($existing)) {
-                $merged = $existing;
-                foreach ($newDenominations as $note => $count) {
-                    $merged[$note] = ($merged[$note] ?? 0) + $count;
-                }
-            } else {
-                $merged = $newDenominations;
+            $duplicates = CashIn::where('id', '!=', $id)
+                ->where(function ($query) use ($addedOrderIds) {
+                    foreach ($addedOrderIds as $orderId) {
+                        $query->orWhereJsonContains('orders', ['order_id' => $orderId]);
+                    }
+                })
+                ->pluck('orders')
+                ->flatten(1)
+                ->pluck('order_id')
+                ->intersect($addedOrderIds)
+                ->values();
+
+            if ($duplicates->isNotEmpty()) {
+                return errorResponse(
+                    'Orders ' . $duplicates->implode(', ') . ' are already linked to another cash-in',
+                    ['duplicate_order_ids' => $duplicates],
+                    422
+                );
+            }
+        }
+
+        return DB::transaction(function () use ($cashIn, $data, $addedOrders, $removedOrderIds) {
+            $existingOrders = collect($cashIn->orders ?? []);
+
+            // Remove unselected orders
+            $updatedOrders = $existingOrders->filter(
+                fn($order) => !in_array($order['order_id'], $removedOrderIds)
+            );
+
+            // Append newly added orders
+            foreach ($addedOrders as $order) {
+                $updatedOrders->push($order);
             }
 
-            $data['denominations'] = $merged;
-        }
+            $updatedOrders = $updatedOrders->values();
 
-        // Update allowed fields
-        $allowedFields = ['cash_in_amount', 'denominations'];
-        $updateData = array_intersect_key($data, array_flip($allowedFields));
+            $cashIn->update([
+                'cash_in_amount' => $data['cash_in_amount'],
+                'denominations'  => $data['denominations'],
+                'vault_id'       => $data['vault_id'],
+                'orders'         => $updatedOrders,
+            ]);
 
-        if (empty($updateData)) {
-            return errorResponse("No valid fields to update", [], 400);
-        }
-
-        $this->cashInRepo->update($id, $updateData);
-
-        return successResponse("Successfully updated cash-in", [], 200);
+            return successResponse("Successfully updated cash-in", $cashIn->fresh(), 200);
+        });
     }
-    // public function getVerifierAllPendingCashInsByStatus()
+
+
+    public function deleteCashIn($id)
+    {
+        $cashIn = $this->find($id);
+
+        if (!$cashIn) {
+            return errorResponse("Cash-in not found", [], 404);
+        }
+
+        if ($cashIn->verifier_status !== 'pending' || $cashIn->approver_status !== 'pending') {
+            return errorResponse("Only pending cash-ins can be deleted", [], 400);
+        }
+
+
+        $cashIn->delete();
+
+        return successResponse("Cash-in deleted successfully", [], 200);
+    }
+
+    // public function getVerifierAllPendingCashInsBySt atus()
     // {
 
     //     $user = auth()->user();

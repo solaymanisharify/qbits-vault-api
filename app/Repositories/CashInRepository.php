@@ -121,7 +121,7 @@ class CashInRepository
         return CashIn::where('verifier_status', 'pending')
             ->whereHas('requiredVerifiers', function ($query) use ($userId) {
                 $query->where('user_id', $userId)
-                    ->where('verified', false); // hasn't verified yet
+                    ->where('verified', false);
             })
             ->with(['requiredVerifiers', 'requiredApprovers'])
             ->get();

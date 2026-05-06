@@ -16,6 +16,7 @@ class PermissionSeeder extends Seeder
 
         // === Define All Permissions ===
         $permissions = [
+
             // Vault Management
             'vault.create',
             'vault.view',
@@ -28,6 +29,7 @@ class PermissionSeeder extends Seeder
             'cash-in.verify',
             'cash-in.approve',
             'cash-in.reject',
+            'cash-in.request',
 
             // Cash Out
             'cash-out.create',

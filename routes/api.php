@@ -78,6 +78,7 @@ Route::middleware('auth:api')->group(function () {
     Route::apiResource('vault', VaultController::class);
     Route::get('/vault/bag/{vaultId}', [VaultController::class, 'getBag']);
     Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);
+    Route::post('/bag/create-request', [VaultController::class, 'createBagRequest']);
 
     Route::get('/get-all-orders', [OrderController::class, 'index']);
 

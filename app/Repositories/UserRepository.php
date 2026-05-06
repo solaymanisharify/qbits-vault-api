@@ -42,9 +42,8 @@ class UserRepository
 
         $users = $query->paginate($perPage);
 
-    
-        return $users;
 
+        return $users;
     }
 
     public function findById(int $id)
@@ -54,18 +53,11 @@ class UserRepository
 
     public function show($id)
     {
-        $user = User::with(['roles.permissions', 'permissions', 'vaultAssignments'])->findOrFail($id); // Load roles and direct permissions
+        $user = User::with(['roles.permissions', 'permissions', 'vaultAssignments.vault:id,name'])->findOrFail($id);
 
         $effectivePermissions = $user->getEffectivePermissions();
 
         return ['data' => $user, 'effective_permissions' => $effectivePermissions];
-
-        // return response()->json([
-        //     'success' => true,
-        //     'message' => 'Successfully fetch user',
-        //     'data' => $user,
-        //     'effective_permissions' => $effectivePermissions // Add this
-        // ]);
     }
     public function getAllUsersPermissionByName($name)
     {
