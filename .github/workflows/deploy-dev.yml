@@ -71,3 +71,5 @@ jobs:
             **/node_modules/**
             **/.env
             **/tests/**
+            **/vendor/**/tests/**
+            **/vendor/**/docs/**
