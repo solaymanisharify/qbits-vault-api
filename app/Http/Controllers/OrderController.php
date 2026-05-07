@@ -13,4 +13,8 @@ class OrderController extends Controller
     {
         return $this->orderService->getOrdersFromQbits($request);
     }
+    public function getOrderPaymentHistory($id)
+    {
+        return $this->orderService->getOrderPaymentHistory($id);
+    }
 }

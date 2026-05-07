@@ -81,6 +81,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/bag/create-request', [VaultController::class, 'createBagRequest']);
 
     Route::get('/get-all-orders', [OrderController::class, 'index']);
+    Route::get('/get/order/{orderId}/payment/history', [OrderController::class, 'getOrderPaymentHistory']);
 
     // reconcile
     Route::get('/reconciles', [ReconcileController::class, 'index']);

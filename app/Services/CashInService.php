@@ -463,18 +463,15 @@ class CashInService
     public function verify($request, $cashInId)
     {
 
+
         $user = auth()->user();
         $cashIn = $this->find($cashInId);
+
 
         // Must have permission
         if (!$user->can('cash-in.verify')) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-
-        // $request->validate([
-        //     'action' => 'required|in:verify,approve,reject',
-        //     'note' => 'nullable|string|max:500',
-        // ]);
 
         $action = $request["action"];
 
@@ -525,7 +522,6 @@ class CashInService
         }
 
         return response()->json([
-            'message' => ucfirst($action) . ' recorded successfully',
             'verifier_status' => $cashIn->verifier_status,
             'status' => $cashIn->status,
         ]);

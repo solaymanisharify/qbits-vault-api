@@ -22,8 +22,8 @@ class CashInRepository
             'user:id,name,email',
             'vault',
             'bags',
-            'requiredVerifiers.user',
-            'requiredApprovers.user',
+            'requiredVerifiers.user:id,name,email',
+            'requiredApprovers.user:id,name,email',
             // // 'branch:id,name,code',
             // 'items' => function ($q) {
             //     $q->select('id', 'cash_in_id', 'denomination', 'quantity', 'amount');
@@ -31,9 +31,9 @@ class CashInRepository
         ]);
 
         // === Role-based access control ===
-        if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
-            $query->where('user_id', auth()->id());
-        }
+        // if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
+        //     $query->where('user_id', auth()->id());
+        // }
 
         // === Search by bag_barcode (indexed column) ===
         if (!empty($filters['search'])) {
@@ -69,6 +69,9 @@ class CashInRepository
         $perPage = min(max($perPage, 1), 100); // Limit between 1-100
 
         $results = $query->paginate($perPage)->appends($filters);
+
+
+
 
         // === Return formatted response ===
         return successResponse(

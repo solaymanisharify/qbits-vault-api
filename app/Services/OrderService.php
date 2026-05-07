@@ -56,4 +56,29 @@ class OrderService
 
         return successResponse('Orders fetched successfully', $data, 200);
     }
+
+    public function getOrderPaymentHistory($id)
+    {
+
+        $result = handleHttpRequest('GET', env('QBITS_SERVICE_BASE_URL') . '/get/order/' . $id . '/payment/history', [
+            'token' => env('QBITS_SERVICE_TOKEN'),
+        ], []);
+
+
+        if (!$result['success']) {
+            \Log::warning('Failed to fetch orders from Qbits', [
+                'status' => $result['status'],
+                'response' => $result['data']
+            ]);
+
+            return errorResponse(
+                message: 'Failed to retrieve orders from Qbits.',
+                errors: $result['data'],
+                status: $result['status'] === 401 ? 401 : 502
+            );
+        };
+
+
+        return successResponse('Orders fetched successfully', $result, 200);
+    }
 }

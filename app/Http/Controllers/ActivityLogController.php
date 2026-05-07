@@ -51,8 +51,6 @@ class ActivityLogController extends Controller
         $perPage = min((int) ($request->per_page ?? 25), 100);
         $logs    = $query->paginate($perPage);
 
-        info($logs);
-
         return response()->json([
             'success' => true,
             'data'    => $logs,
