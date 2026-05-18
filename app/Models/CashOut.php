@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class CashOut extends Model
 {
-    protected $fillable = ["user_id", "vault_id", "tran_id", "cash_out_amount", "verifier_status", "status", "note"];
+    protected $fillable = ["user_id", "cash_in_id","vault_id", "tran_id", "cash_out_amount", "request_amount", "verifier_status", "approver_status", "note"];
 
     public function user()
     {
@@ -24,6 +24,10 @@ class CashOut extends Model
     public function cashOutBags()
     {
         return $this->hasMany(CashOutBag::class, 'cash_out_id', 'id');
+    }
+    public function custodian()
+    {
+        return $this->belongsTo(CustodianCashHistory::class, 'id', 'cash_out_id');
     }
 
 

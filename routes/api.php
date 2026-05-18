@@ -44,6 +44,7 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{userId}/update-permissions', [UserController::class, 'UpdatePermission']);
         Route::post('/{user}/vaults/toggle', [UserController::class, 'toggleVaultAssign']);
         Route::put('/{userId}/vaults/{vaultId}/roles', [UserController::class, 'updateVaultRoles']);
+        Route::get('/custodian/{vaultId}', [UserController::class, 'getVaultCustodians']);
 
         Route::put('/{userId}/toggle-status', [UserController::class, 'toggleUserStatus']);
         Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
@@ -58,11 +59,14 @@ Route::middleware('auth:api')->group(function () {
 
     // cashin
     Route::apiResource('/cash-in', CashInController::class);
+    Route::get('/cash-ins/{vaultId}', [CashInController::class, 'getCashInsByVaultId']);
     Route::get('/pending/cash-in', [CashInController::class, 'listPending']);
     Route::post('/verify/cash-in/{cashInId}', [CashInController::class, 'verify']);
     Route::post('/approve/cash-in/{cashInId}', [CashInController::class, 'approved']);
+
     // role
     Route::apiResource('/roles', RoleController::class);
+
 
 
     // cashout
@@ -70,6 +74,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/pending/cash-out', [CashOutController::class, 'listPending']);
     Route::post('/verify/cash-out/{cashOutId}', [CashOutController::class, 'verify']);
     Route::post('/approve/cash-out/{cashOutId}', [CashOutController::class, 'approved']);
+
+    // custodian verify
+    Route::post('/custodian/verify/{cashOutId}', [CashOutController::class, 'custodianVerify']);
 
     //permissions
     Route::apiResource('/permissions', PermissionController::class);

@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\CashIn;
+use App\Models\CashOut;
 
 class CashInRepository
 {
@@ -136,6 +137,17 @@ class CashInRepository
         return CashIn::where('verifier_status', 'verified')
             ->where('status', 'pending')
             ->with(['requiredVerifiers', 'requiredApprovers'])
+            ->get();
+    }
+
+    public function getCashInsByVaultId($vaultId)
+    {
+
+        return CashIn::with('bags:id,barcode')
+            ->where('vault_id', $vaultId)
+            ->where('verifier_status', 'verified')
+            ->where('approver_status', 'approved')
+            ->whereDoesntHave('cashOut')
             ->get();
     }
 }

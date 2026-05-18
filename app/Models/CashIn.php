@@ -22,11 +22,15 @@ class CashIn extends Model
 
     public function bags()
     {
-        return $this->belongsTo(VaultBag::class, 'bag_id','id');
+        return $this->belongsTo(VaultBag::class, 'bag_id', 'id');
     }
     public function vault()
     {
         return $this->belongsTo(Vault::class);
+    }
+    public function cashOut()
+    {
+        return $this->belongsTo(CashOut::class,'id','cash_in_id');
     }
 
     public function verifications()

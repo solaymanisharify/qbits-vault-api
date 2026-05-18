@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Services\CashOutService;
+use App\Services\CustodianService;
 use Illuminate\Http\Request;
 
 class CashOutController extends Controller
 {
 
-    public function __construct(protected CashOutService $cashOutService) {}
+    public function __construct(protected CashOutService $cashOutService, protected CustodianService $custodianService) {}
 
     public function index()
     {
@@ -44,12 +45,20 @@ class CashOutController extends Controller
     {
         return $this->cashOutService->getVerifierAllPendingCashOutsByStatus();
     }
-    public function verify(Request $request, $id)
+    public function verify($id)
     {
-        return $this->cashOutService->verify($request->all(), $id);
+        return $this->cashOutService->verify($id);
     }
-    public function approved(Request $request, $id)
+    public function approved($id)
     {
-        return $this->cashOutService->approved($request->all(), $id);
+        return $this->cashOutService->approved($id);
+    }
+    public function custodianVerify($id)
+    {
+        return $this->custodianService->verifyReceivedCash($id);
+    }
+    public function destroy($id)
+    {
+        return $this->cashOutService->deleteCashOut($id);
     }
 }

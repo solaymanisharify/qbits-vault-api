@@ -264,4 +264,10 @@ class UserController extends Controller
         $data = base64_encode(file_get_contents($fullPath));
         return "data:{$mime};base64,{$data}";
     }
+
+
+    public function getVaultCustodians($vaultId)
+    {
+        return $this->userService->getVaultCustodians($vaultId);
+    }
 }

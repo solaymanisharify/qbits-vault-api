@@ -58,6 +58,10 @@ class CashInController extends Controller
     // }
 
     // List cash-ins for verifiers
+    public function getCashInsByVaultId($id)
+    {
+        return $this->cashInService->getCashInsByVaultId($id);
+    }
     public function listPending()
     {
         return $this->cashInService->getVerifierAllPendingCashInsByStatus();

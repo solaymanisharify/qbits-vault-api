@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
-use App\Repositories\CashInRequiredRepository;
+use App\Models\CustodianCashHistory;
+use App\Models\VaultAssign;
 use App\Repositories\CashOutBagRepository;
 use App\Repositories\CashOutRepository;
 use App\Repositories\CashOutRequiredRepository;
 use Illuminate\Support\Facades\DB;
-
+use Spatie\Permission\Models\Role;
+use Illuminate\Support\Str;
 
 class CashOutService
 {
@@ -16,7 +18,7 @@ class CashOutService
 
     public function getAll()
     {
-        return  $this->cashOutRepo->getAll(request()->only('search', 'user_id'));
+        return  $this->cashOutRepo->getAll(request()->only('search'));
     }
 
     public function find($id)
@@ -30,18 +32,84 @@ class CashOutService
         $data["user_id"] = auth()->id();
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
+        $data["cash_in_id"] = $data["cash_in_id"];
+
+        $vaultId = $data['vault_id'];
 
 
-        return DB::transaction(function () use ($data) {
-            $data["tran_id"] = uniqid();
+        $roles = Role::whereIn('name', ['verifier', 'approver'])->get()->keyBy('name');
+
+        $verifierRole = $roles->get('verifier');
+        $approverRole = $roles->get('approver');
+
+        if (!$verifierRole || !$approverRole) {
+            $message = match (true) {
+                !$verifierRole && !$approverRole => 'Verifier and approver roles not found',
+                !$verifierRole                   => 'Verifier role not found',
+                !$approverRole                   => 'Approver role not found',
+            };
+
+            return errorResponse(['message' => $message], [
+                'verifier_role' => (bool) $verifierRole,
+                'approver_role' => (bool) $approverRole,
+                'role_status' => false,
+            ], 500);
+        }
+
+        if ($vaultId) {
+
+            $assignments = VaultAssign::where('vault_id', $vaultId)
+                ->where('status', 'active')
+                ->get(['user_id', 'roles']);
+
+
+            $verifierUserIds = $assignments
+                ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+            $approverUserIds = $assignments
+                ->filter(fn($a) => in_array($approverRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+
+            if ($verifierUserIds->isEmpty() || $approverUserIds->isEmpty()) {
+                $message = match (true) {
+                    $verifierUserIds->isEmpty() && $approverUserIds->isEmpty() => 'Verifier and approver not found for this vault',
+                    $verifierUserIds->isEmpty()                                => 'Verifier not found for this vault',
+                    $approverUserIds->isEmpty()                                => 'Approver not found for this vault',
+                };
+
+                return errorResponse(['message' => $message], [
+                    'verifier_found' => !$verifierUserIds->isEmpty(),
+                    'approver_found' => !$approverUserIds->isEmpty(),
+                    'role_status'    => false,
+                ], 500);
+            }
+        }
+
+
+        return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds, $vaultId) {
+            $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
+
             $cashOut = $this->cashOutRepo->create($data);
 
             $cashOutId = $cashOut->id;
 
+            if (!empty($data["custodian_id"])) {
+                CustodianCashHistory::create([
+                    'custodian_id' => $data["custodian_id"],
+                    'vault_id' => $vaultId,
+                    'cash_out_id' => $cashOutId,
+                    'amount' => $data["cash_out_amount"] - $data["request_amount"],
+                ]);
+            }
+
+
+
             foreach ($data["bags"] as $bag) {
                 $cashOutBagData = [
                     'cash_out_id' => $cashOutId,  // Use the stored ID
-                    'bags_id' => $bag['id'],
+                    'bags_id' => $bag['bag_id'],
                     'verifier_status' => $data["verifier_status"],
                     'status' => $data["status"],
                 ];
@@ -50,35 +118,19 @@ class CashOutService
             }
 
 
-            // Get users with 'cash-out.verify' permission
-            $verifiers = $this->userService->getAllUsersPermissionByName('cash-out.verify');
-
-            // Get users with 'cash-out.approve' permission
-            $approvers = $this->userService->getAllUsersPermissionByName('cash-out.approve');
-
-            // Optional: Exclude super-admin or admin (adjust role/spatie check as per your system)
-            $verifiers = $verifiers->reject(function ($user) {
-                return $user->hasRole(['Super Admin', 'Admin']); // Spatie example
-                // Or if you use a different way: return in_array($user->role, ['super-admin', 'admin']);
-            });
-
-            $approvers = $approvers->reject(function ($user) {
-                return $user->hasRole(['Super Admin', 'Admin']);
-            });
-
             // Create verifier records
-            foreach ($verifiers as $verifier) {
+            foreach ($verifierUserIds as $verifier) {
                 $this->cashOutRequired->create([
                     'cash_out_id' => $cashOutId,
-                    'user_id'    => $verifier->id,
+                    'user_id'    => $verifier,
                 ]);
             }
 
             // Create approver records
-            foreach ($approvers as $approver) {
+            foreach ($approverUserIds as $approver) {
                 $this->cashOutRequired->createApprover([
                     'cash_out_id' => $cashOutId,
-                    'user_id'    => $approver->id,
+                    'user_id'    => $approver,
                     // 'type'       => 'approver', // optional
                 ]);
             }
@@ -86,6 +138,7 @@ class CashOutService
             return successResponse("Successfully created cash-in", [], 200);
         });
     }
+
     // public function getVerifierAllPendingCashInsByStatus()
     // {
 
@@ -162,7 +215,7 @@ class CashOutService
         );
     }
 
-    public function approved($request, $cashOutId)
+    public function approved($cashOutId)
     {
 
         $user = auth()->user();
@@ -174,12 +227,6 @@ class CashOutService
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // $request->validate([
-        //     'action' => 'required|in:verify,approve,reject',
-        //     'note' => 'nullable|string|max:500',
-        // ]);
-
-        // $action = $request["action"];
 
         // Check if this user is a required verifier for this Cashout
         $requiredApprover = $cashOut->requiredApprovers()
@@ -259,11 +306,15 @@ class CashOutService
             'status' => $cashOut->status,
         ]);
     }
-    public function verify($request, $cashOutId)
+    public function verify($cashOutId)
     {
- 
+
         $user = auth()->user();
         $cashOut = $this->find($cashOutId);
+
+        if (!$cashOut) {
+            return response()->json(['error' => 'CashOut not found'], 404);
+        }
 
 
 
@@ -276,8 +327,6 @@ class CashOutService
         //     'action' => 'required|in:verify,approve,reject',
         //     'note' => 'nullable|string|max:500',
         // ]);
-
-        $action = $request["action"];
 
         // Check if this user is a required verifier for this CashIn
         $requiredVerifier = $cashOut->requiredVerifiers()
@@ -317,18 +366,36 @@ class CashOutService
         }
 
         // Handle approve/reject (only if user has permission)
-        if ($action === 'approve' && $user->can('cash-in.approve')) {
-            $cashOut->status = 'approved';
-            $cashOut->save();
-        } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-            $cashOut->status = 'rejected';
-            $cashOut->save();
-        }
+        // if ($action === 'approve' && $user->can('cash-in.approve')) {
+        //     $cashOut->status = 'approved';
+        //     $cashOut->save();
+        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
+        //     $cashOut->status = 'rejected';
+        //     $cashOut->save();
+        // }
 
         return response()->json([
-            'message' => ucfirst($action) . ' recorded successfully',
+            'message' => 'Verified successfully',
             'verifier_status' => $cashOut->verifier_status,
             'status' => $cashOut->status,
         ]);
+    }
+
+    public function deleteCashOut($cashOutId)
+    {
+        $cashOut = $this->find($cashOutId);
+
+        if (!$cashOut) {
+            return errorResponse("Cash-out not found", [], 404);
+        }
+
+        if ($cashOut->verifier_status !== 'pending' || $cashOut->approver_status !== 'pending') {
+            return errorResponse("Only pending cash-out can be deleted", [], 400);
+        }
+
+
+        $cashOut->delete();
+
+        return successResponse("Cash-out deleted successfully", [], 200);
     }
 }

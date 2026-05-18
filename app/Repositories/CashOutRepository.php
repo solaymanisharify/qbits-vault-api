@@ -21,10 +21,11 @@ class CashOutRepository
         // === Eager load relationships to avoid N+1 queries ===
         $query->with([
             'user:id,name,email',
-            'vault:id,vault_id',
+            'vault:id,vault_code,name',
             'cashOutBags.bag',
-            'requiredVerifiers.user',
-            'requiredApprovers.user',
+            'requiredVerifiers.user:id,name,email',
+            'requiredApprovers.user:id,name,email',
+            'custodian.custodian:id,name,email',
             // // 'branch:id,name,code',
             // 'items' => function ($q) {
             //     $q->select('id', 'cash_in_id', 'denomination', 'quantity', 'amount');
@@ -32,9 +33,9 @@ class CashOutRepository
         ]);
 
         // === Role-based access control ===
-        if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
-            $query->where('user_id', auth()->id());
-        }
+        // if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
+        //     $query->where('user_id', auth()->id());
+        // }
 
         // === Search by bag_barcode (indexed column) ===
         if (!empty($filters['search'])) {
@@ -98,7 +99,7 @@ class CashOutRepository
 
     public function find($id)
     {
-        return $this->model->with(['requiredVerifiers', 'requiredApprovers', 'vault', 'user','cashOutBags.bag'])->findOrFail($id);
+        return $this->model->with(['requiredVerifiers', 'requiredApprovers', 'vault', 'user', 'cashOutBags.bag'])->findOrFail($id);
     }
 
     public function findByBarcode(string $barcode)

@@ -5,8 +5,12 @@ namespace App\Services;
 use App\Mail\InactiveUserEmailVerification;
 use App\Models\Otp;
 use App\Models\User;
+use App\Models\VaultAssign;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Mail;
+use Spatie\Permission\Models\Role;
+
+use function Laravel\Prompts\error;
 
 class UserService
 {
@@ -148,5 +152,26 @@ class UserService
         handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
 
         // Mail::to($user->email)->send(new InactiveUserEmailVerification($user));
+    }
+
+
+    public function getVaultCustodians($vaultId)
+    {
+        $custodianRoleId = Role::where('name', 'custodian')->value('id');
+
+        if (!$custodianRoleId) {
+            return errorResponse(['message' => 'Custodian role not found'], [], 404);
+        }
+
+        info($custodianRoleId);
+
+
+        $custodians = VaultAssign::where('vault_id', $vaultId)
+            ->where('status', 'active')
+            ->whereJsonContains('roles', $custodianRoleId)
+            ->with('user:id,name,email,status')
+            ->get(['user_id', 'roles']);
+
+        return response()->json($custodians->pluck('user'));
     }
 }

@@ -330,6 +330,12 @@ class CashInService
             200
         );
     }
+    public function getCashInsByVaultId($vaultId)
+    {
+        $cashIns = $this->cashInRepo->getCashInsByVaultId($vaultId);
+
+        return successResponse("Successfully fetched cash-ins", $cashIns, 200);
+    }
 
     public function approved($request, $cashInId)
     {
@@ -389,7 +395,7 @@ class CashInService
 
 
             if ($result['success'] === true) {
-                $cashIn->status = 'approved';
+                $cashIn->approver_status = 'approved';
                 $cashIn->save();
 
                 $bag = $cashIn->bags;
