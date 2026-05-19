@@ -27,7 +27,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('verifier_status');
-            $table->index('status');
+            $table->index('approver_status');
         });
     }
 
