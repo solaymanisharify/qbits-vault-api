@@ -29,7 +29,7 @@ return new class extends Migration
             // Optional indexes for better performance
             $table->index('bag_id');
             $table->index('verifier_status');
-            $table->index('status');
+            $table->index('approver_status');
         });
     }
 
