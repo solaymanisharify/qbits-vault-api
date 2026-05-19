@@ -70,8 +70,8 @@ class CashInController extends Controller
     {
         return $this->cashInService->verify($request->all(), $id);
     }
-    public function approved(Request $request, $id)
+    public function approved($id)
     {
-        return $this->cashInService->approved($request->all(), $id);
+        return $this->cashInService->approved($id);
     }
 }

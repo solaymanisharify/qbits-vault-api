@@ -337,7 +337,7 @@ class CashInService
         return successResponse("Successfully fetched cash-ins", $cashIns, 200);
     }
 
-    public function approved($request, $cashInId)
+    public function approved($cashInId)
     {
         $user = auth()->user();
         $cashIn = $this->find($cashInId);

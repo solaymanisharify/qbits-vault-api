@@ -16,6 +16,10 @@ class CashOutController extends Controller
         return $this->cashOutService->getAll(request()->only('search', 'user_id'));
     }
 
+    public function show($id)
+    {
+        return $this->cashOutService->find($id);
+    }
     public function store(Request $request)
     {
         return $this->cashOutService->createCashOut($request->all());
