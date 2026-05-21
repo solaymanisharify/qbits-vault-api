@@ -17,7 +17,8 @@ return new class extends Migration
             $table->unsignedBigInteger('vault_id')->nullable(false);
             $table->enum('status', [
                 'pending',          // just created, waiting for counter
-                'in_progress',      // counting in progress
+                'counting',      // counting in progress
+                'counted',      // counting in progress
                 'verification',     // waiting for verifiers
                 'approval',         // waiting for final approver
                 'completed',        // successfully finished
@@ -27,6 +28,8 @@ return new class extends Migration
             ])->default('pending');
 
             // Lock management
+            $table->int('total_bags');
+            $table->int('finished_bag_count');
             $table->boolean('is_locked')->default(false);           // whether this reconcile is currently locking the scope
             $table->timestamp('locked_until')->nullable();         // optional timeout for lock
 

@@ -434,18 +434,6 @@ class CashInService
                     $bag->total_cash_in_attempts += 1;
                     $bag->total_successful_deposits += 1;
 
-                    // Optional: add to history
-                    // $history = $bag->history ?? [];
-                    // $history[] = [
-                    //     'action' => 'cash_in',
-                    //     'amount' => $cashIn->cash_in_amount,
-                    //     'tran_id' => $cashIn->tran_id,
-                    //     'by' => $cashIn->user_id,
-                    //     'at' => now()->toDateTimeString(),
-                    //     'note' => 'Deposited via cash-in approval',
-                    // ];
-                    // $bag->history = $history;
-
                     $bag->save();
                 }
             }

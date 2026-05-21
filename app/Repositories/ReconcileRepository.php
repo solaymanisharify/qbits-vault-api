@@ -17,20 +17,9 @@ class ReconcileRepository
             'requiredApprovers.user',
             'startedBy',
             'completedBy',
-            'varianceBags',
-            'vault:id,vault_id,name',
+            'varianceBags:id,vault_id,barcode,rack_number',
+            'vault:id,vault_code,name',
         ]);
-
-        // === Role-based access control ===
-        // if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
-        //     $query->where('user_id', auth()->id());
-        // }
-
-        // === Search by bag_barcode (indexed column) ===
-        // if (!empty($filters['search'])) {
-        //     $search = trim($filters['search']);
-        //     $query->where('bag_barcode', 'LIKE', $search . '%'); // Prefix search for better index usage
-        // }
 
         // === Status filters (indexed) ===
         if (!empty($filters['status'])) {
@@ -73,7 +62,7 @@ class ReconcileRepository
 
     public function findById($id)
     {
-        return Reconciliation::findOrFail($id);
+        return Reconciliation::with(['varianceBags:id,vault_id,barcode,rack_number,current_amount,denominations', 'vault.bags:id,vault_id,barcode,rack_number,current_amount'])->findOrFail($id);
     }
     public function getLatestReconcile()
     {
@@ -90,7 +79,7 @@ class ReconcileRepository
         return Reconciliation::where('verifier_status', 'pending')
             ->whereHas('requiredVerifiers', function ($query) use ($userId) {
                 $query->where('user_id', $userId)
-                    ->where('verified', false); // hasn't verified yet
+                    ->where('verified', false);
             })
             ->with(['requiredVerifiers', 'requiredApprovers'])
             ->get();

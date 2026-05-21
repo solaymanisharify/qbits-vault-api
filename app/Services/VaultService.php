@@ -3,13 +3,11 @@
 namespace App\Services;
 
 use App\Repositories\VaultRepository;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use App\Models\Vault;
 
 class VaultService
 {
-    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService, protected VaultAuditConfigService $vaultAuditConfigService) {}
 
     public function getAll(array $filters = [])
     {
@@ -37,7 +35,12 @@ class VaultService
         }
 
         $data["balance"] = $vaultBalance;
+
         $this->repository->update($vault->id, $data);
+
+        // create vault audit
+        $vaultAuditConfig["vault_id"] = $vault->id;
+        $this->vaultAuditConfigService->create($vaultAuditConfig);
     }
 
     public function show(int $id)
@@ -63,5 +66,4 @@ class VaultService
         // You could dispatch events, soft-delete related data, etc.
         return $this->repository->destroy($id);
     }
-   
 }

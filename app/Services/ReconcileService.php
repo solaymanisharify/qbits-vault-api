@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\VaultAssign;
 use App\Repositories\ReconcileRepository;
 use App\Repositories\ReconcileRequiredRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 use function Symfony\Component\String\s;
 
@@ -19,6 +22,10 @@ class ReconcileService
     {
         return $this->reconcileRepository->index($request);
     }
+    public function show($id)
+    {
+        return $this->reconcileRepository->findById($id);
+    }
     public function findById($id)
     {
         return $this->reconcileRepository->findById($id);
@@ -30,72 +37,111 @@ class ReconcileService
 
     public function create($data)
     {
-        $data['started_by'] = auth()->user()->id;
+
         $data["reconcile_tran_id"] = $this->generateReconcileId();
 
         return DB::transaction(function () use ($data) {
+            $vaultId = $data['vault_id'];
 
             $reconcile = $this->reconcileRepository->createReconcile($data);
 
-            // Helper to get effective users for a permission, considering overrides
-            $getEffectiveUsers = function ($permissionName) {
-                $permission = Permission::findByName($permissionName);
-                $permissionId = $permission->id;
+            $roles = Role::whereIn('name', ['verifier', 'auditor'])->get()->keyBy('name');
 
-                // Get users who have the permission via roles or direct assignment (Spatie)
-                $usersWithPermission = User::permission($permissionName)->get();
 
-                // Get user_ids with override granted=false (to remove)
-                $overridesFalse = DB::table('user_permission_overrides')
-                    ->where('permission_id', $permissionId)
-                    ->where('granted', false)
-                    ->pluck('user_id');
+            info($roles);
 
-                // Remove those with granted=false
-                $usersWithPermission = $usersWithPermission->whereNotIn('id', $overridesFalse);
+            $verifierRole = $roles->get('verifier');
+            $auditorRole = $roles->get('Auditor');
 
-                // Get user_ids with override granted=true (to add if not already included)
-                $overridesTrue = DB::table('user_permission_overrides')
-                    ->where('permission_id', $permissionId)
-                    ->where('granted', true)
-                    ->pluck('user_id');
+            if (!$verifierRole || !$auditorRole) {
+                info("come inside");
+                $message = match (true) {
+                    !$verifierRole && !$auditorRole => 'Verifier and Auditor roles not found',
+                    !$verifierRole                   => 'Verifier role not found',
+                    !$auditorRole                   => 'Auditor role not found',
+                };
 
-                // Get users for granted=true
-                $additionalUsers = User::whereIn('id', $overridesTrue)->get();
-
-                // Merge and unique
-                $effectiveUsers = $usersWithPermission->concat($additionalUsers)->unique('id');
-
-                // Exclude super-admin or admin
-                $effectiveUsers = $effectiveUsers->reject(function ($user) {
-                    return $user->hasRole(['Super Admin', 'Admin']);
-                });
-
-                return $effectiveUsers;
-            };
-
-            // Get effective verifiers
-            $verifiers = $getEffectiveUsers('reconciliation.verify');
-
-            // Get effective approvers
-            $approvers = $getEffectiveUsers('reconciliation.approve');
-
-            // Create verifier records
-            foreach ($verifiers as $verifier) {
-                $this->reconcileRequired->createVerifier([
-                    'reconcile_id' => $reconcile->id,
-                    'user_id'    => $verifier->id,
-                ]);
+                return errorResponse(['message' => $message], [
+                    'verifier_role' => (bool) $verifierRole,
+                    'approver_role' => (bool) $auditorRole,
+                    'role_status' => false,
+                ], 500);
             }
 
-            // Create approver records
-            foreach ($approvers as $approver) {
-                $this->reconcileRequired->createApprover([
+
+            $assignments = VaultAssign::where('vault_id', $vaultId)
+                ->where('status', 'active')
+                ->get(['user_id', 'roles']);
+
+
+            $verifierUserIds = $assignments
+                ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+            $auditorUserIds = $assignments
+                ->filter(fn($a) => in_array($auditorRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+            if ($verifierUserIds->isEmpty() || $auditorUserIds->isEmpty()) {
+                $message = match (true) {
+                    $verifierUserIds->isEmpty() && $auditorUserIds->isEmpty() => 'Verifier and Auditor not found for this vault',
+                    $verifierUserIds->isEmpty()                                => 'Verifier not found for this vault',
+                    $auditorUserIds->isEmpty()                                => 'Auditor not found for this vault',
+                };
+
+                return errorResponse(['message' => $message], [
+                    'verifier_found' => !$verifierUserIds->isEmpty(),
+                    'approver_found' => !$auditorUserIds->isEmpty(),
+                    'role_status'    => false,
+                ], 500);
+            }
+
+            // Helper to get effective users for a permission, considering overrides
+            // $getEffectiveUsers = function ($permissionName) {
+            //     $permission = Permission::findByName($permissionName);
+            //     $permissionId = $permission->id;
+
+            //     // Get users who have the permission via roles or direct assignment (Spatie)
+            //     $usersWithPermission = User::permission($permissionName)->get();
+
+            //     // Get user_ids with override granted=false (to remove)
+            //     $overridesFalse = DB::table('user_permission_overrides')
+            //         ->where('permission_id', $permissionId)
+            //         ->where('granted', false)
+            //         ->pluck('user_id');
+
+            //     // Remove those with granted=false
+            //     $usersWithPermission = $usersWithPermission->whereNotIn('id', $overridesFalse);
+
+            //     // Get user_ids with override granted=true (to add if not already included)
+            //     $overridesTrue = DB::table('user_permission_overrides')
+            //         ->where('permission_id', $permissionId)
+            //         ->where('granted', true)
+            //         ->pluck('user_id');
+
+            //     // Get users for granted=true
+            //     $additionalUsers = User::whereIn('id', $overridesTrue)->get();
+
+            //     // Merge and unique
+            //     $effectiveUsers = $usersWithPermission->concat($additionalUsers)->unique('id');
+
+            //     // Exclude super-admin or admin
+            //     $effectiveUsers = $effectiveUsers->reject(function ($user) {
+            //         return $user->hasRole(['Super Admin', 'Admin']);
+            //     });
+
+            //     return $effectiveUsers;
+            // };
+
+            // Get effective verifiers
+            // $verifiers = $getEffectiveUsers('reconciliation.verify');
+
+            // Create verifier records
+            foreach ($verifierUserIds as $verifier) {
+                $this->reconcileRequired->createVerifier([
                     'reconcile_id' => $reconcile->id,
-                    'user_id'    => $approver->id,
+                    'user_id'    => $verifier,
                 ]);
-                // Or if you have a separate method/table:
-                // $this->cashInRequired->createApprover([...]);
             }
 
             return successResponse("Successfully created cash-in", [], 200);
@@ -167,7 +213,7 @@ class ReconcileService
         //     'note' => 'nullable|string|max:500',
         // ]);
 
-        $action = $request["action"];
+        // $action = $request["action"];
 
         // Check if this user is a required verifier for this CashIn
         $requiredVerifier = $reconcile->requiredVerifiers()
@@ -206,17 +252,8 @@ class ReconcileService
             $reconcile->save();
         }
 
-        // Handle approve/reject (only if user has permission)
-        if ($action === 'approve' && $user->can('cash-in.approve')) {
-            $reconcile->status = 'approved';
-            $reconcile->save();
-        } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-            $reconcile->status = 'rejected';
-            $reconcile->save();
-        }
-
         return response()->json([
-            'message' => ucfirst($action) . ' recorded successfully',
+            'message' => ' Verify recorded successfully',
             'verifier_status' => $reconcile->verifier_status,
             'status' => $reconcile->status,
         ]);
@@ -226,18 +263,50 @@ class ReconcileService
     {
         $reconcile = $this->findById($reconcileId);
 
+        $total_bags = $reconcile->vault->bags()->count();
+
+        // Log::info($total_bags);
+
+        $expected_balance = $reconcile->vault->bags()->sum('current_amount');
+
+
+
+        // $vault =  $reconcile->vault();
+
         if ($reconcile->status !== 'pending' || $reconcile->is_locked) {
             return response()->json(['error' => 'Cannot start reconciliation'], 400);
         }
 
-        $reconcile->status = 'in_progress';
-        $reconcile->completed_by = auth()->user()->id;
+        $reconcile->expected_balance = $expected_balance;
         $reconcile->is_locked = true;
-        $reconcile->locked_until = now()->addHours(24);
+        $reconcile->status = 'counting';
+        $reconcile->total_bags = $total_bags;
+        $reconcile->started_by = auth()->user()->id;
+        $reconcile->locked_until = now()->addHours(6);
         $reconcile->save();
 
-        return response()->json(['success' => true]);
+        return successResponse("Successfully started reconcile", $reconcile, 200);
     }
+    // public function saveReconcile($reconcileId)
+    // {
+    //     $reconcile = $this->findById($reconcileId);
+
+    //     // $vault =  $reconcile->vault();
+
+    //     if ($reconcile->status !== 'pending' || $reconcile->is_locked) {
+    //         return response()->json(['error' => 'Cannot start reconciliation'], 400);
+    //     }
+
+    //     $reconcile->is_locked = true;
+    //     $reconcile->status = 'counting';
+    //     $reconcile->started_by = auth()->user()->id;
+    //     $reconcile->locked_until = now()->addHours(6);
+    //     $reconcile->save();
+
+    //     return successResponse("Successfully started reconcile", $reconcile, 200);
+
+    //     // return response()->json(['success' => true]);
+    // }
 
     public function latestReconcile()
     {
@@ -257,18 +326,16 @@ class ReconcileService
             'status' => $reconciliation->status,
         ]);
     }
-    public function completeReconcile($data, $id)
+    public function saveReconcile($data, $id)
     {
         $reconcile = $this->findById($id);
 
         $reconcile->resolution_reason   = $data['resolution_reason'] ?? null;
-        $reconcile->status              = 'completed';
         $reconcile->variance_type       = $data['variance_type'] ?? 'unknown';
         $reconcile->variance            = $data['total_variance'] ?? 0;
-        $reconcile->approver_status     = 'approved';
-        $reconcile->completed_by        = auth()->user()->id;
-        $reconcile->is_locked           = false;
-        $reconcile->locked_until        = null;
+        $reconcile->started_by        = auth()->user()->id;
+        $reconcile->is_locked           = true;
+        $reconcile->locked_until = now()->addHours(6);
 
         $expected_balance = 0;
         $counted_balance  = 0;
@@ -283,26 +350,41 @@ class ReconcileService
             $expected_balance += $bag->current_amount ?? 0;
             $counted_balance  += $item['counted_amount'] ?? 0;
 
+            $item['difference'] = $item['expected_amount'] - $item['counted_amount'];
+
             $reconcile->varianceBags()->attach($item['bag_id'], [
                 'difference'            => $item['difference'] ?? 0,
                 'note'                  => $item['note'] ?? null,
                 'counted_amount'        => $item['counted_amount'] ?? 0,
-                'counted_denominations' => json_encode($item['counted_denominations'] ?? []),
+                // 'counted_denominations' => json_encode($item['counted_denominations'] ?? []),
                 'expected_amount'       => $bag->current_amount ?? 0,
             ]);
 
-            if ($item['difference'] < 0) {
-                $bag->current_amount -= $item['difference'];
-                $bag->save();
-            }
-            if ($item['difference'] > 0) {
-                $bag->current_amount += $item['difference'];
-                $bag->save();
-            }
+            // if ($item['difference'] < 0) {
+            //     $bag->current_amount -= $item['difference'];
+            //     $bag->save();
+            // }
+            // if ($item['difference'] > 0) {
+            //     $bag->current_amount += $item['difference'];
+            //     $bag->save();
+            // }
         }
+        $reconcile->finished_bag_count += count($data['variances_bags'] ?? []);
+        $reconcile->counted_balance  += $counted_balance;
+        if ($reconcile->total_bags == $reconcile->finished_bag_count) {
+            $reconcile->status = 'counted';
+        }
+        $reconcile->save();
+    }
 
-        $reconcile->expected_balance = $expected_balance;
-        $reconcile->counted_balance  = $counted_balance;
+    public function endReconcile($id)
+    {
+        $reconcile = $this->findById($id);
+        $reconcile->status = 'completed';
+        $reconcile->completed_by = auth()->user()->id;
+        $reconcile->is_locked = false;
+        $reconcile->locked_until = null;
+        $reconcile->to_date = now();
         $reconcile->save();
     }
 }

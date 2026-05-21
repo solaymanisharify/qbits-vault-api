@@ -11,6 +11,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReconcileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VaultAuditConfigController;
 use App\Http\Controllers\VaultController;
 use Illuminate\Support\Facades\Route;
 
@@ -87,19 +88,24 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);
     Route::post('/bag/create-request', [VaultController::class, 'createBagRequest']);
 
+    // vault audit config
+    Route::apiResource('vault-audit-config', VaultAuditConfigController::class);
+
     Route::get('/get-all-orders', [OrderController::class, 'index']);
     Route::get('/get/order/{orderId}/payment/history', [OrderController::class, 'getOrderPaymentHistory']);
 
     // reconcile
     Route::get('/reconciles', [ReconcileController::class, 'index']);
+    Route::get('/reconciles/{reconcileId}', [ReconcileController::class, 'show']);
     Route::get('/reconcile/latest', [ReconcileController::class, 'latestReconcile']);
     Route::post('/reconcile', [ReconcileController::class, 'create']);
     Route::get('/pending/reconciles', [ReconcileController::class, 'listPending']);
     Route::post('/reconcile/verify/{reconcileId}', [ReconcileController::class, 'verify']);
     Route::post('/reconcile/approve/{reconcileId}', [ReconcileController::class, 'approved']);
     Route::post('/reconcile/start/{reconcileId}', [ReconcileController::class, 'startReconcile']);
+    Route::post('/reconcile/end/{reconcileId}', [ReconcileController::class, 'endReconcile']);
     Route::get('/reconciliation/check', [ReconcileController::class, 'checkReconcile']);
-    Route::put('/reconciliation/complete/{reconcileId}', [ReconcileController::class, 'completeReconcile']);
+    Route::put('/reconciliation/save/{reconcileId}', [ReconcileController::class, 'saveReconcile']);
 
     //dashboard reports
     Route::get('/dashboard/reports', [DashboardController::class, 'index']);

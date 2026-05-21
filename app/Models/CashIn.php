@@ -30,7 +30,7 @@ class CashIn extends Model
     }
     public function cashOut()
     {
-        return $this->belongsTo(CashOut::class,'id','cash_in_id');
+        return $this->belongsTo(CashOut::class, 'id', 'cash_in_id');
     }
 
     public function verifications()

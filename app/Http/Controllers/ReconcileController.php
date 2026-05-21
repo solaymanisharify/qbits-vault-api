@@ -13,6 +13,10 @@ class ReconcileController extends Controller
     {
         return  $this->reconcileService->index($request->all());
     }
+    public function show($id)
+    {
+        return  $this->reconcileService->show($id);
+    }
 
     public function create(Request $request)
     {
@@ -35,6 +39,10 @@ class ReconcileController extends Controller
     {
         return $this->reconcileService->startReconcile($id);
     }
+    public function endReconcile($id)
+    {
+        return $this->reconcileService->endReconcile($id);
+    }
 
     public function latestReconcile()
     {
@@ -44,8 +52,8 @@ class ReconcileController extends Controller
     {
         return  $this->reconcileService->checkReconcile();
     }
-    public function completeReconcile(Request $request, $id)
+    public function saveReconcile(Request $request, $id)
     {
-        return  $this->reconcileService->completeReconcile($request->all(), $id);
+        return  $this->reconcileService->saveReconcile($request->all(), $id);
     }
 }
