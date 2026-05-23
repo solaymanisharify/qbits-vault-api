@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class VaultAuditConfig extends Model
 {
-    protected $fillable = ['vault_id', 'interval', 'time', 'day', 'last_audit_date', 'failed_audits', 'config_by','status'];
+    protected $fillable = ['vault_id', 'interval', 'time', 'day', 'last_audit_date', 'next_audit_date', 'failed_audits', 'config_by', 'status'];
 
     public function vault()
     {

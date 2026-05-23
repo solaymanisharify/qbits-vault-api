@@ -68,6 +68,24 @@ class ReconcileRepository
     {
         return Reconciliation::latest()->first();
     }
+
+    public function checkReconcileLockStatusByVaultId($vaultId)
+    {
+        $reconciliation = Reconciliation::where('vault_id', $vaultId)->where('is_locked', true)->first();
+
+        return successResponse(
+            "Successfully retrieved",
+            [
+                'is_locked' => $reconciliation->is_locked
+            ],
+            200
+        );
+    }
+
+    public function getPendingReconcileByVaultId($vaultId)
+    {
+        return Reconciliation::where('vault_id', $vaultId)->where('status', 'pending')->first();
+    }
     public function createReconcile($data)
     {
         return Reconciliation::create($data);

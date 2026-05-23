@@ -48,9 +48,9 @@ class ReconcileController extends Controller
     {
         return  $this->reconcileService->latestReconcile();
     }
-    public function checkReconcile()
+    public function checkReconcile($id)
     {
-        return  $this->reconcileService->checkReconcile();
+        return  $this->reconcileService->checkReconcile($id);
     }
     public function saveReconcile(Request $request, $id)
     {

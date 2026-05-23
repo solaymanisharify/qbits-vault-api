@@ -46,7 +46,7 @@ return new class extends Migration
 
             // Timing
             $table->timestamp('from_date')->useCurrent();
-            $table->timestamp('to_date')->nullable();
+            $table->time('audit_time')->nullable();
             $table->timestamp('expected_completion_at')->nullable();  // deadline
 
             // Additional control

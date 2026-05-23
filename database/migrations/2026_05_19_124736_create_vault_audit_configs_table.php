@@ -18,6 +18,7 @@ return new class extends Migration
             $table->enum('day', ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'])->nullable();
             $table->time('time')->nullable();
             $table->date('last_audit_date')->nullable();
+            $table->timestamps('next_audit_date')->nullable();
             $table->integer('failed_audits')->default(0);
             $table->foreignId('config_by')->nullable()->constrained('users')->onDelete('cascade');
             $table->enum('status', ['not_configured', 'configured'])->default('not_configured');

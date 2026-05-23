@@ -20,7 +20,7 @@ class Reconciliation extends Model
         'started_by',
         'completed_by',
         'from_date',
-        'to_date',
+        'audit_time',
         'expected_completion_at',
         'notes',
         'resolution_reason',

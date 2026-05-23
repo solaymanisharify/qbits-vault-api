@@ -104,7 +104,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/reconcile/approve/{reconcileId}', [ReconcileController::class, 'approved']);
     Route::post('/reconcile/start/{reconcileId}', [ReconcileController::class, 'startReconcile']);
     Route::post('/reconcile/end/{reconcileId}', [ReconcileController::class, 'endReconcile']);
-    Route::get('/reconciliation/check', [ReconcileController::class, 'checkReconcile']);
+    Route::get('/reconciliation/check/{vaultId}', [ReconcileController::class, 'checkReconcile']);
     Route::put('/reconciliation/save/{reconcileId}', [ReconcileController::class, 'saveReconcile']);
 
     //dashboard reports

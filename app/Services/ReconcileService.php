@@ -34,6 +34,14 @@ class ReconcileService
     {
         return $this->reconcileRepository->getLatestReconcile();
     }
+    public function checkReconcileLockStatusByVaultId($vaultId)
+    {
+        return $this->reconcileRepository->checkReconcileLockStatusByVaultId($vaultId);
+    }
+    public function getPendingReconcileByVaultId($vaultId)
+    {
+        return $this->reconcileRepository->getPendingReconcileByVaultId($vaultId);
+    }
 
     public function create($data)
     {
@@ -48,13 +56,10 @@ class ReconcileService
             $roles = Role::whereIn('name', ['verifier', 'auditor'])->get()->keyBy('name');
 
 
-            info($roles);
-
             $verifierRole = $roles->get('verifier');
             $auditorRole = $roles->get('Auditor');
 
             if (!$verifierRole || !$auditorRole) {
-                info("come inside");
                 $message = match (true) {
                     !$verifierRole && !$auditorRole => 'Verifier and Auditor roles not found',
                     !$verifierRole                   => 'Verifier role not found',
@@ -313,18 +318,9 @@ class ReconcileService
         $reconcile = $this->getLatestReconcile();
         return successResponse("Successfully fetched latest reconcile", $reconcile, 200);
     }
-    public function checkReconcile()
+    public function checkReconcile($vaultId)
     {
-        $reconciliation = $this->getLatestReconcile();
-
-        if (!$reconciliation) {
-            return response()->json(['is_locked' => false, 'status' => 'completed']);
-        }
-
-        return response()->json([
-            'is_locked' => $reconciliation->is_locked,
-            'status' => $reconciliation->status,
-        ]);
+        return $this->checkReconcileLockStatusByVaultId($vaultId);
     }
     public function saveReconcile($data, $id)
     {

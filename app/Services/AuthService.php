@@ -60,7 +60,7 @@ class AuthService
             'access_token' => $token,
         ];
 
-        if (!$user->verified && !$user->email_verified_at) {
+        if (!$user->verified && !$user->email_verified_at && !$user->hasRole('super-admin')) {
             $this->userService->notVerifiedUserEmailVerification($user);
         }
 
