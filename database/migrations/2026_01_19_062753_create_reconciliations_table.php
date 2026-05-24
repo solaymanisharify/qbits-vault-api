@@ -16,22 +16,22 @@ return new class extends Migration
             $table->string('reconcile_tran_id');
             $table->unsignedBigInteger('vault_id')->nullable(false);
             $table->enum('status', [
-                'pending',          // just created, waiting for counter
-                'counting',      // counting in progress
-                'counted',      // counting in progress
-                'verification',     // waiting for verifiers
-                'approval',         // waiting for final approver
-                'completed',        // successfully finished
-                'rejected',         // rejected - needs to be restarted
-                'cancelled',        // manually cancelled
-                'failed',           // system/technical error
+                'pending',
+                'counting',
+                'counted',
+                'verification',
+                'approval',
+                'completed',
+                'rejected',
+                'cancelled',
+                'failed',
             ])->default('pending');
 
             // Lock management
             $table->int('total_bags');
             $table->int('finished_bag_count');
-            $table->boolean('is_locked')->default(false);           // whether this reconcile is currently locking the scope
-            $table->timestamp('locked_until')->nullable();         // optional timeout for lock
+            $table->boolean('is_locked')->default(false);
+            $table->timestamp('locked_until')->nullable();
 
             // Financial summary
             $table->decimal('expected_balance', 15, 2)->nullable();   // what system expected
