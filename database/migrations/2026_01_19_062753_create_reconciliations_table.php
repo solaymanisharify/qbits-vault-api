@@ -28,8 +28,8 @@ return new class extends Migration
             ])->default('pending');
 
             // Lock management
-            $table->int('total_bags');
-            $table->int('finished_bag_count');
+            $table->integer('total_bags');
+            $table->integer('finished_bag_count');
             $table->boolean('is_locked')->default(false);
             $table->timestamp('locked_until')->nullable();
 
