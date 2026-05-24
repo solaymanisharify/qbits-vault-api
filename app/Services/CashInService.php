@@ -371,17 +371,28 @@ class CashInService
             return response()->json(['error' => 'You have already approvered this CashIn'], 400);
         }
 
-
-        // Check if ALL required verifiers have verified
-        $totalRequired = $cashIn->requiredApprovers()->count();
-        $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
-
+        // Log the verification action
+        // CashInVerification::create([
+        //     'cash_in_id' => $cashIn->id,
+        //     'user_id' => $user->id,
+        //     'action' => $action,
+        //     'note' => $request->note,
+        // ]);
 
         // Mark as verified in required table
         $requiredApprover->update([
             'approved' => true,
             'approved_at' => now(),
         ]);
+
+        // Check if ALL required verifiers have verified
+        $totalRequired = $cashIn->requiredApprovers()->count();
+        $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
+
+        info("totalRequired");
+        info($totalRequired);
+        info("totalApproved");
+        info($totalApproved);
 
         if ($totalApproved === $totalRequired) {
 
@@ -394,7 +405,6 @@ class CashInService
 
 
             if ($result['success'] === true) {
-
                 $cashIn->approver_status = 'approved';
                 $cashIn->save();
 
@@ -436,18 +446,20 @@ class CashInService
 
                     $bag->save();
                 }
-
-                return successResponse('Cash-in approved successfully', [
-                    'cash_in' => $cashIn->fresh(),
-                    'bag' => $bag,
-                ], 200);
             }
-
-            return errorResponse($result['message'], [], 400);
         }
 
+        // Handle approve/reject (only if user has permission)
+        // if ($action === 'approve' && $user->can('cash-in.approve')) {
+        //     $cashIn->status = 'approved';
+        //     $cashIn->save();
+        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
+        //     $cashIn->status = 'rejected';
+        //     $cashIn->save();
+        // }
+
         return response()->json([
-            'message' => '  Cash-in approval recorded',
+            'message' => ' recorded successfully',
             'verifier_status' => $cashIn->verifier_status,
             'status' => $cashIn->status,
         ]);
