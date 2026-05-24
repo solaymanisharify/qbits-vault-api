@@ -379,11 +379,7 @@ class CashInService
         //     'note' => $request->note,
         // ]);
 
-        // Mark as verified in required table
-        $requiredApprover->update([
-            'approved' => true,
-            'approved_at' => now(),
-        ]);
+
 
         // Check if ALL required verifiers have verified
         $totalRequired = $cashIn->requiredApprovers()->count();
@@ -405,6 +401,13 @@ class CashInService
 
 
             if ($result['success'] === true) {
+
+                // Mark as verified in required table
+                $requiredApprover->update([
+                    'approved' => true,
+                    'approved_at' => now(),
+                ]);
+
                 $cashIn->approver_status = 'approved';
                 $cashIn->save();
 
@@ -446,20 +449,18 @@ class CashInService
 
                     $bag->save();
                 }
+
+                return successResponse('Cash-in approved successfully', [
+                    'cash_in' => $cashIn->fresh(),
+                    'bag' => $bag,
+                ], 200);
             }
+
+            return errorResponse($result['message'], [], 400);
         }
 
-        // Handle approve/reject (only if user has permission)
-        // if ($action === 'approve' && $user->can('cash-in.approve')) {
-        //     $cashIn->status = 'approved';
-        //     $cashIn->save();
-        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-        //     $cashIn->status = 'rejected';
-        //     $cashIn->save();
-        // }
-
         return response()->json([
-            'message' => ' recorded successfully',
+            'message' => '  Cash-in approval recorded',
             'verifier_status' => $cashIn->verifier_status,
             'status' => $cashIn->status,
         ]);
