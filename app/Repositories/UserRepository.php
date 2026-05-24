@@ -15,7 +15,7 @@ class UserRepository
     public function __construct(protected RoleService $roleService) {}
     public function index($request = null)
     {
-        $query = User::with('roles', 'permissions', 'vaultAssignments')->orderBy('created_at', 'desc');;
+        $query = User::with('roles', 'permissions', 'vaultAssignments','defaultVault:id,name')->orderBy('created_at', 'desc');;
 
         // Search functionality
         $search = null;

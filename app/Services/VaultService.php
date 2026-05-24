@@ -50,6 +50,11 @@ class VaultService
         return successResponse("Successfully fetch vault", $vault, 200);
     }
 
+    public function find(int $id)
+    {
+        return $this->repository->find($id);
+    }
+
     public function edit(int $id): Vault
     {
         return $this->repository->edit($id);
@@ -61,9 +66,22 @@ class VaultService
         return $this->repository->update($id, $data);
     }
 
-    public function delete(int $id): bool
+    public function delete(int $id)
     {
-        // You could dispatch events, soft-delete related data, etc.
+
+        $vault = $this->find($id);
+
+        if (!$vault) {
+            return errorResponse('Vault not found.', [], 404);
+        }
+
+        // Check if any bags inside the vault have an amount
+        $hasAmount = $vault->bags()->where('current_amount', '>', 0)->exists();
+
+        if ($hasAmount) {
+            return errorResponse('Vault cannot be deleted. Please cash out all bags before deleting.', [], 400);
+        }
+
         return $this->repository->destroy($id);
     }
 }

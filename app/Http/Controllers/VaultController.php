@@ -42,9 +42,7 @@ class VaultController extends Controller
 
     public function destroy($id)
     {
-        $this->vaultService->delete($id);
-
-        return redirect()->route('vaults.index')->with('success', 'Vault deleted!');
+        return $this->vaultService->delete($id);
     }
 
     public function getBag(Request $request, $id)

@@ -259,8 +259,6 @@ class VaultAuditConfigService
 
     public function update($data, $id)
     {
-        info($data);
-
         // 1. Fetch targeted config configuration data matrix
         $configItem = $this->vaultAuditConfigRepository->find($id);
 
@@ -316,8 +314,6 @@ class VaultAuditConfigService
                     break;
             }
 
-            info($targetDateTime);
-
             // 2. Validate calculations and verify lock boundaries
             if ($targetDateTime) {
                 $lockoutStart = (clone $targetDateTime)->subHours(6);
@@ -328,8 +324,6 @@ class VaultAuditConfigService
                         422
                     );
                 }
-
-                // ✅ Attach calculated next_audit_date into the update payload
                 $data['next_audit_date'] = $targetDateTime->toDateTimeString();
             }
         }

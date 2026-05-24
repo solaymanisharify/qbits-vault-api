@@ -88,6 +88,10 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(VaultAssign::class);
     }
 
+    public function defaultVault()
+    {
+        return $this->hasOne(Vault::class, 'id', 'default_vault_id');
+    }
     public function vaults()
     {
         return $this->hasManyThrough(

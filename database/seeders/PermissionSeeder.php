@@ -49,14 +49,18 @@ class PermissionSeeder extends Seeder
             // Users & Roles
             'user.create',
             'user.view',
+            'user.details',
             'user.edit',
             'user.delete',
             'role.create',
             'role.view',
             'role.edit',
             'role.delete',
+
+            // Permissions
             'permission.create',
             'permission.view',
+            'permission.edit',
 
             // Reports
             'report.daily',

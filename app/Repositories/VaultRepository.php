@@ -65,6 +65,10 @@ class VaultRepository
     {
         return Vault::with('bags')->findOrFail($id);
     }
+    public function find(int $id): ?Vault
+    {
+        return Vault::findOrFail($id);
+    }
 
     /**
      * Get a vault instance for editing.
