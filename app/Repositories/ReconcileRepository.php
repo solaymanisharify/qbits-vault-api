@@ -64,6 +64,10 @@ class ReconcileRepository
     {
         return Reconciliation::with(['varianceBags:id,vault_id,barcode,rack_number,current_amount,denominations', 'vault.bags:id,vault_id,barcode,rack_number,current_amount'])->findOrFail($id);
     }
+    public function update($data, $id)
+    {
+        return Reconciliation::where('id', $id)->update($data);
+    }
     public function getLatestReconcile()
     {
         return Reconciliation::latest()->first();

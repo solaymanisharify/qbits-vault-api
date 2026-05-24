@@ -17,6 +17,10 @@ class ReconcileController extends Controller
     {
         return  $this->reconcileService->show($id);
     }
+    public function update(Request $request, $id)
+    {
+        return  $this->reconcileService->update($request->all(), $id);
+    }
 
     public function create(Request $request)
     {

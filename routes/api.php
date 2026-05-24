@@ -97,6 +97,7 @@ Route::middleware('auth:api')->group(function () {
     // reconcile
     Route::get('/reconciles', [ReconcileController::class, 'index']);
     Route::get('/reconciles/{reconcileId}', [ReconcileController::class, 'show']);
+    Route::put('/reconciles/{reconcileId}', [ReconcileController::class, 'update']);
     Route::get('/reconcile/latest', [ReconcileController::class, 'latestReconcile']);
     Route::post('/reconcile', [ReconcileController::class, 'create']);
     Route::get('/pending/reconciles', [ReconcileController::class, 'listPending']);

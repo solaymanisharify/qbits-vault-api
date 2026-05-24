@@ -26,6 +26,12 @@ class ReconcileService
     {
         return $this->reconcileRepository->findById($id);
     }
+    public function update($data, $id)
+    {
+        $reconcile = $this->reconcileRepository->update($data, $id);
+        return successResponse("Successfully updated reconcile", $reconcile, 200);
+    }
+
     public function findById($id)
     {
         return $this->reconcileRepository->findById($id);
