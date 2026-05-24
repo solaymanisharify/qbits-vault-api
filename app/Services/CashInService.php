@@ -360,6 +360,8 @@ class CashInService
             ->where('user_id', $user->id)
             ->first();
 
+        info("requiredApprover");
+        info($requiredApprover);
 
         if (!$requiredApprover) {
             return response()->json(['error' => 'You are not assigned as a approver for this CashIn'], 403);
@@ -387,11 +389,19 @@ class CashInService
         $totalRequired = $cashIn->requiredApprovers()->count();
         $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
 
+        info("totalRequired");
+        info($totalRequired);
+        info("totalApproved");
+        info($totalApproved);
+
         if ($totalApproved === $totalRequired) {
 
             $result = handleHttpRequest('POST', env('QBITS_SERVICE_BASE_URL') . '/deposit-orders', [
                 'token' => env('QBITS_SERVICE_TOKEN'),
             ], [$cashIn]);
+
+            info("result");
+            info($result);
 
 
             if ($result['success'] === true) {

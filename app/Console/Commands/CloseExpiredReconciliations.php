@@ -29,21 +29,26 @@ class CloseExpiredReconciliations extends Command
     {
         $this->info('Checking for expired reconciliation sessions...');
 
-        // Define the expiration boundary (6 hours ago from right now)
-        $expirationThreshold = Carbon::now();
+        /**
+         * Because the DB saves dates with a UTC 'Z' marker, Carbon needs to 
+         * look up the threshold relative to the application's configured timezone.
+         */
+        $expirationThreshold = Carbon::now(config('app.timezone'))->subHours(6)->toDateTimeString();
+        
+        $this->info("Looking for sessions scheduled before: {$expirationThreshold}");
 
         /**
          * We search for records where:
          * 1. status is 'pending'
          * 2. it hasn't been locked yet (is_locked = false)
-         * 3. The combined timestamp of (DATE(from_date) + audit_time) is older than 6 hours ago
+         * 3. Combined date + time string context is less than or equal to the threshold
          */
         $affectedRows = DB::table('reconciliations')
             ->where('status', 'pending')
             ->where('is_locked', false)
             ->whereRaw("
                 CONCAT(DATE(from_date), ' ', audit_time) <= ?
-            ", [$expirationThreshold->subHours(6)->toDateTimeString()])
+            ", [$expirationThreshold])
             ->update([
                 'status' => 'expired',
                 'updated_at' => Carbon::now()
