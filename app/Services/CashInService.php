@@ -371,24 +371,17 @@ class CashInService
             return response()->json(['error' => 'You have already approvered this CashIn'], 400);
         }
 
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
-
-
 
         // Check if ALL required verifiers have verified
         $totalRequired = $cashIn->requiredApprovers()->count();
         $totalApproved = $cashIn->requiredApprovers()->where('approved', true)->count();
 
-        info("totalRequired");
-        info($totalRequired);
-        info("totalApproved");
-        info($totalApproved);
+
+        // Mark as verified in required table
+        $requiredApprover->update([
+            'approved' => true,
+            'approved_at' => now(),
+        ]);
 
         if ($totalApproved === $totalRequired) {
 
@@ -401,12 +394,6 @@ class CashInService
 
 
             if ($result['success'] === true) {
-
-                // Mark as verified in required table
-                $requiredApprover->update([
-                    'approved' => true,
-                    'approved_at' => now(),
-                ]);
 
                 $cashIn->approver_status = 'approved';
                 $cashIn->save();

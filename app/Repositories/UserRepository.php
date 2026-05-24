@@ -152,7 +152,7 @@ class UserRepository
         $roles = $this->roleService->find($roleData);
 
         if ($roles->isEmpty()) {
-            return response()->json(['error' => 'Invalid roles provided'], 422);
+            return errorResponse('Invalid roles provided', [], 422);
         }
 
         // Authorization check
@@ -163,9 +163,7 @@ class UserRepository
             );
 
             if ($hasRestrictedRole) {
-                return response()->json([
-                    'error' => 'Admins cannot assign Super Admin role'
-                ], 403);
+                return errorResponse('Admins cannot assign Super Admin role', [], 403);
             }
         }
 
@@ -201,10 +199,8 @@ class UserRepository
 
         $newUser->load('roles');
 
-        return response()->json([
-            'message' => 'User created successfully',
-            'user'    => $newUser
-        ], 201);
+        return successResponse("User created successfully", $newUser, 201);
+
     }
     // Add this method to your RoleService if it doesn't exist
     // public function findMultiple(array $roleIds)
