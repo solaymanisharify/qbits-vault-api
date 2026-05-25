@@ -26,7 +26,7 @@ class VaultService
             $data["vault_id"] = $vault->id;
             $data["barcode"] = $bag["barcode"];
             $data["bag_identifier_barcode"] = $bag["bag_identifier_barcode"];
-            $data["rack_number"] = $bag["rack_number"];
+            $data["rack_number"] = rand(1, 3);
             $data["current_amount"] = $bag["current_amount"];
 
             $this->vaultBagService->store($data);
