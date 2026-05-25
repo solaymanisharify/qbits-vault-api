@@ -259,74 +259,31 @@ class VaultAuditConfigService
 
     public function update($data, $id)
     {
-        // 1. Fetch targeted config configuration data matrix
+        $this->vaultAuditConfigRepository->update($data, $id);
+
         $configItem = $this->vaultAuditConfigRepository->find($id);
 
-        if ($configItem && $configItem->time) {
-            $now = Carbon::now();
-            $interval = strtolower($configItem->interval);
-            $dayName  = strtolower($configItem->day ?? '');
-            $timeStr  = $configItem->time;
-            $lastAuditDate = $configItem->last_audit_date;
-
-            $targetDateTime = null;
-
-            switch ($interval) {
-                case 'daily':
-                    $targetDateTime = Carbon::parse("today {$timeStr}");
-                    if ($now->isAfter($targetDateTime)) {
-                        $targetDateTime->addDay();
-                    }
-                    break;
-
-                case 'weekly':
-                    if (empty($dayName)) break;
-                    $targetDateTime = Carbon::parse("this {$dayName} {$timeStr}");
-                    if ($now->isAfter($targetDateTime)) {
-                        $targetDateTime->addWeek();
-                    }
-                    break;
-
-                case 'bi-weekly':
-                case 'biweekly':
-                    if (empty($dayName)) break;
-                    $baseDate = $lastAuditDate ? Carbon::parse($lastAuditDate) : Carbon::now();
-                    $targetDateTime = $baseDate->copy()->addWeeks(2)->next($dayName)->setTimeFromTimeString($timeStr);
-                    while ($now->isAfter($targetDateTime)) {
-                        $targetDateTime->addWeeks(2);
-                    }
-                    break;
-
-                case 'monthly':
-                    if (empty($dayName)) break;
-                    $targetDateTime = Carbon::parse("last {$dayName} of this month {$timeStr}");
-                    if ($now->isAfter($targetDateTime)) {
-                        $futureMonthStr = $now->copy()->addMonth()->format('F Y');
-                        $targetDateTime = Carbon::parse("last {$dayName} of {$futureMonthStr} {$timeStr}");
-                    }
-                    break;
-
-                case 'quarterly':
-                case 'quaterly':
-                    if (empty($dayName)) break;
-                    // Find the last Thursday (or given day) of the current quarter-end month
-                    $targetDateTime = $this->resolveQuarterlyTarget($dayName, $timeStr, $now);
-                    break;
-            }
-
-            // 2. Validate calculations and verify lock boundaries
-            if ($targetDateTime) {
-                $lockoutStart = (clone $targetDateTime)->subHours(6);
-
-                if ($now->between($lockoutStart, $targetDateTime)) {
-                    return errorResponse(
-                        "You cannot edit configuration settings within 6 hours of the active audit running interval.",
-                        422
-                    );
-                }
-                $data['next_audit_date'] = $targetDateTime->toDateTimeString();
-            }
+        if (!$configItem) {
+            return errorResponse("Config not found", [], 404);
         }
+
+        $targetDateTime =  $this->resolveNextTargetDateTime($configItem);
+
+        $now = Carbon::now();
+
+        if ($targetDateTime) {
+            $lockoutStart = (clone $targetDateTime)->subHours(6);
+
+            if ($now->between($lockoutStart, $targetDateTime)) {
+                return errorResponse(
+                    "You cannot edit configuration settings within 6 hours of the active audit running interval.",
+                    [],
+                    422
+                );
+            }
+            $data['next_audit_date'] = $targetDateTime->toDateTimeString();
+        }
+
 
         // 3. Fall through execution when context windows clear successfully
         $config = $this->vaultAuditConfigRepository->update($data, $id);
@@ -335,7 +292,7 @@ class VaultAuditConfigService
         $vaultId = $configItem->vault_id;
 
         if ($vaultId) {
-            $this->handleReconcileOnConfigUpdate($vaultId, $configItem);
+            $this->handleReconcileOnConfigUpdate($vaultId, $configItem->id);
         }
 
         return successResponse("Successfully updated config", $config, 200);
@@ -343,8 +300,12 @@ class VaultAuditConfigService
 
 
 
-    private function handleReconcileOnConfigUpdate($vaultId, $configItem): void
+    private function handleReconcileOnConfigUpdate($vaultId, $configId): void
     {
+
+
+        $configItem = $this->vaultAuditConfigRepository->find($configId);
+
         $existingReconcile = $this->reconcileService->getPendingReconcileByVaultId($vaultId);
 
         if ($existingReconcile) {
@@ -375,6 +336,7 @@ class VaultAuditConfigService
 
     private function resolveNextTargetDateTime($configItem): ?Carbon
     {
+
         if (!$configItem->time) {
             return null;
         }
@@ -384,7 +346,7 @@ class VaultAuditConfigService
         $interval = strtolower($configItem->interval);
         $dayName  = strtolower($configItem->day ?? '');
         $timeStr  = $configItem->time;
-        $lastAuditDate = $configItem->last_audit_date;
+        $lastAuditDate = $configItem->next_audit_date;
 
         $targetDateTime = null;
 
