@@ -386,7 +386,6 @@ class ReconcileService
         $reconcile->completed_by = auth()->user()->id;
         $reconcile->is_locked = false;
         $reconcile->locked_until = null;
-        $reconcile->to_date = now();
         $reconcile->save();
     }
 }

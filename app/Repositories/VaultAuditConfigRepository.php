@@ -34,7 +34,7 @@ class VaultAuditConfigRepository
         }
 
         // Pagination
-        $perPage = (int) ($params->get('per_page', 15));
+        $perPage = (int) ($params->get('per_page', 150));
         $results = $query->paginate($perPage)->withQueryString();
 
         return successResponse('Vault audit configs fetched successfully', $results, 200);
