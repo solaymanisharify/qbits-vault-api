@@ -70,8 +70,11 @@ class PermissionSeeder extends Seeder
 
         Role::firstOrCreate(
             ['name' => 'admin'],
-            ['name' => 'web']
-            );
+            ['name' => 'verifier'],
+            ['name' => 'approver'],
+            ['name' => 'bag create'],
+            ['name' => 'custodian'],
+        );
 
         // Create permissions
         foreach ($permissions as $permission) {
