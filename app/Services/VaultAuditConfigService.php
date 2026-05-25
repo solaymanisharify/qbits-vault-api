@@ -342,18 +342,9 @@ class VaultAuditConfigService
     }
 
 
-    /**
-     * Resolve quarterly next target:
-     * Quarter-end months → March, June, September, December
-     * Find the last <dayName> of the current quarter-end month.
-     * If already past → jump to the next quarter-end month.
-     */
-
-
 
     private function handleReconcileOnConfigUpdate($vaultId, $configItem): void
     {
-        // Check if a pending reconciliation already exists for this vault
         $existingReconcile = $this->reconcileService->getPendingReconcileByVaultId($vaultId);
 
         if ($existingReconcile) {
@@ -370,13 +361,15 @@ class VaultAuditConfigService
                 }
             }
 
-            // Outside 6-hour window but pending exists → still skip to avoid duplicates
-            // (remove this return if you want to force a new one outside the window)
+
             return;
         }
 
-        // No pending reconciliation → safe to create a new one
-        $this->reconcileService->create(['vault_id' => $vaultId]);
+        $reconcileData["vault_id"] = $vaultId;
+        $reconcileData["from_date"] = $configItem->next_audit_date;
+        $reconcileData["audit_time"] = $configItem->time;
+
+        $this->reconcileService->create($reconcileData);
     }
 
 

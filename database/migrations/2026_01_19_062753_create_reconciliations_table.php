@@ -29,8 +29,8 @@ return new class extends Migration
             ])->default('pending');
 
             // Lock management
-            $table->integer('total_bags');
-            $table->integer('finished_bag_count');
+            $table->integer('total_bags')->nullable();
+            $table->integer('finished_bag_count')->nullable();
             $table->boolean('is_locked')->default(false);
             $table->timestamp('locked_until')->nullable();
 
@@ -46,7 +46,7 @@ return new class extends Migration
             $table->unsignedBigInteger('completed_by')->nullable();   // who finally approved/closed
 
             // Timing
-            $table->timestamp('from_date')->useCurrent();
+            $table->timestamp('from_date')->nullable();
             $table->time('audit_time')->nullable();
             $table->timestamp('expected_completion_at')->nullable();  // deadline
 
