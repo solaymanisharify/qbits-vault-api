@@ -66,7 +66,9 @@ class CashInService
 
         $bagAmountLimit = 200000;
 
-        $roles = Role::whereIn('name', ['verifier', 'approver'])->get()->keyBy('name');
+        $roles = Role::whereIn(DB::raw('LOWER(name)'), ['verifier', 'approver'])
+            ->get()
+            ->keyBy(fn($role) => strtolower($role->name));
 
 
 
@@ -255,43 +257,6 @@ class CashInService
         return successResponse("Cash-in deleted successfully", [], 200);
     }
 
-    // public function getVerifierAllPendingCashInsBySt atus()
-    // {
-
-    //     $user = auth()->user();
-
-    //     if ($user->can('cash-in.verify')) {
-    //         $cashIns = $this->cashInRepo->getVerifierAllPendingCashInsByStatus(['pending']);
-    //     } else if ($user->can('cash-in.approve')) {
-    //         $cashIns = $this->cashInRepo->getVerifierAllPendingCashInsByStatus(['approved']);
-    //     } else {
-    //         return response()->json(['error' => 'Unauthorized'], 403);
-    //     }
-
-    //     return successResponse("Successfully fetch all pending cash-ins", $cashIns->load('verifications.user'), 200);
-    // }
-
-    // public function getVerifierAllPendingCashInsByStatus()
-    // {
-    //     $user = auth()->user();
-
-    //     // For Verifiers: Show only pending CashIns where this user hasn't verified yet
-    //     if ($user->can('cash-in.verify')) {
-    //         $cashIns = $this->cashInRepo->getPendingForVerifier($user->id);
-    //     }
-    //     // For Approvers: Show verified CashIns awaiting approval
-    //     elseif ($user->can('cash-in.approve')) {
-    //         $cashIns = $this->cashInRepo->getPendingForApprover();
-    //     } else {
-    //         return errorResponse('Unauthorized', 403);
-    //     }
-
-    //     return successResponse(
-    //         "Successfully fetched pending cash-ins",
-    //         $cashIns->load(['verifications.user', 'requiredVerifiers.user', 'vault']),
-    //         200
-    //     );
-    // }
     public function getVerifierAllPendingCashInsByStatus()
     {
         $user = auth()->user();
@@ -482,14 +447,6 @@ class CashInService
         if ($requiredVerifier->verified) {
             return response()->json(['error' => 'You have already verified this CashIn'], 400);
         }
-
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
 
         // Mark as verified in required table
         $requiredVerifier->update([

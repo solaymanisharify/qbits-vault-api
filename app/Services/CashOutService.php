@@ -37,7 +37,9 @@ class CashOutService
         $vaultId = $data['vault_id'];
 
 
-        $roles = Role::whereIn('name', ['verifier', 'approver'])->get()->keyBy('name');
+        $roles = Role::whereIn(DB::raw('LOWER(name)'), ['verifier', 'approver'])
+            ->get()
+            ->keyBy(fn($role) => strtolower($role->name));
 
         $verifierRole = $roles->get('verifier');
         $approverRole = $roles->get('approver');
@@ -131,7 +133,6 @@ class CashOutService
                 $this->cashOutRequired->createApprover([
                     'cash_out_id' => $cashOutId,
                     'user_id'    => $approver,
-                    // 'type'       => 'approver', // optional
                 ]);
             }
 
@@ -139,43 +140,6 @@ class CashOutService
         });
     }
 
-    // public function getVerifierAllPendingCashInsByStatus()
-    // {
-
-    //     $user = auth()->user();
-
-    //     if ($user->can('cash-in.verify')) {
-    //         $cashIns = $this->cashInRepo->getVerifierAllPendingCashInsByStatus(['pending']);
-    //     } else if ($user->can('cash-in.approve')) {
-    //         $cashIns = $this->cashInRepo->getVerifierAllPendingCashInsByStatus(['approved']);
-    //     } else {
-    //         return response()->json(['error' => 'Unauthorized'], 403);
-    //     }
-
-    //     return successResponse("Successfully fetch all pending cash-ins", $cashIns->load('verifications.user'), 200);
-    // }
-
-    // public function getVerifierAllPendingCashInsByStatus()
-    // {
-    //     $user = auth()->user();
-
-    //     // For Verifiers: Show only pending CashIns where this user hasn't verified yet
-    //     if ($user->can('cash-in.verify')) {
-    //         $cashIns = $this->cashInRepo->getPendingForVerifier($user->id);
-    //     }
-    //     // For Approvers: Show verified CashIns awaiting approval
-    //     elseif ($user->can('cash-in.approve')) {
-    //         $cashIns = $this->cashInRepo->getPendingForApprover();
-    //     } else {
-    //         return errorResponse('Unauthorized', 403);
-    //     }
-
-    //     return successResponse(
-    //         "Successfully fetched pending cash-ins",
-    //         $cashIns->load(['verifications.user', 'requiredVerifiers.user', 'vault']),
-    //         200
-    //     );
-    // }
     public function getVerifierAllPendingCashOutsByStatus()
     {
         $user = auth()->user();
@@ -323,11 +287,6 @@ class CashOutService
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // $request->validate([
-        //     'action' => 'required|in:verify,approve,reject',
-        //     'note' => 'nullable|string|max:500',
-        // ]);
-
         // Check if this user is a required verifier for this CashIn
         $requiredVerifier = $cashOut->requiredVerifiers()
             ->where('user_id', $user->id)
@@ -342,13 +301,6 @@ class CashOutService
             return response()->json(['error' => 'You have already verified this CashOut'], 400);
         }
 
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
 
         // Mark as verified in required table
         $requiredVerifier->update([
@@ -364,15 +316,6 @@ class CashOutService
             $cashOut->verifier_status = 'verified';
             $cashOut->save();
         }
-
-        // Handle approve/reject (only if user has permission)
-        // if ($action === 'approve' && $user->can('cash-in.approve')) {
-        //     $cashOut->status = 'approved';
-        //     $cashOut->save();
-        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-        //     $cashOut->status = 'rejected';
-        //     $cashOut->save();
-        // }
 
         return response()->json([
             'message' => 'Verified successfully',

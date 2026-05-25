@@ -68,6 +68,11 @@ class PermissionSeeder extends Seeder
             'report.custom',
         ];
 
+        Role::firstOrCreate(
+            ['name' => 'admin'],
+            ['name' => 'web']
+            );
+
         // Create permissions
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
