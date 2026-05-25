@@ -82,6 +82,7 @@ class VaultService
             return errorResponse('Vault cannot be deleted. Please cash out all bags before deleting.', [], 400);
         }
 
-        return $this->repository->destroy($id);
+        $vault = $this->repository->destroy($id);
+        return successResponse('Vault deleted successfully.', $vault, 200);
     }
 }

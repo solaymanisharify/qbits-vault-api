@@ -86,7 +86,7 @@ class PermissionSeeder extends Seeder
             ['email' => 'super@admin.com'],
             [
                 'name'     => 'Super Admin',
-                'password' => bcrypt('123'), // Change this in production!
+                'password' => bcrypt('123'),
             ]
         );
 

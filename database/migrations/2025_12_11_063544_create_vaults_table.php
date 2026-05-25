@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('vault_code')->unique();
             $table->string('name');
             $table->string('address')->nullable();
+            $table->integer('bag_limit')->nullable();
             $table->decimal('balance', 15, 2)->default(0);
             $table->decimal('bag_balance_limit', 15, 2)->default(200000.00);
             $table->string('total_racks')->nullable();

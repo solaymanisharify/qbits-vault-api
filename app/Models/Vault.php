@@ -12,6 +12,7 @@ class Vault extends Model
         'vault_code',
         'name',
         'address',
+        'bag_limit',
         'balance',
         'total_racks',
         'total_bags',

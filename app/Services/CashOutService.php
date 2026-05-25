@@ -251,18 +251,10 @@ class CashOutService
             $vault->last_cash_out = now();
             $vault->save();
 
-            $cashOut->status = 'approved';
+            $cashOut->approver_status = 'approved';
             $cashOut->save();
         }
 
-        // Handle approve/reject (only if user has permission)
-        // if ($action === 'approve' && $user->can('cash-in.approve')) {
-        //     $cashIn->status = 'approved';
-        //     $cashIn->save();
-        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-        //     $cashIn->status = 'rejected';
-        //     $cashIn->save();
-        // }
 
         return response()->json([
             'message' => ' recorded successfully',

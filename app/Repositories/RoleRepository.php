@@ -26,7 +26,7 @@ class RoleRepository
     }
     public function find($id)
     {
-        return $this->model->whereIn('id', $id)->get();
+        return $this->model->whereIn('id', (array) $id)->get();
     }
     public function create($data)
     {
