@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e73a2ec3a57a369db0a20299f474475c",
+    "content-hash": "2a10f66d3300f6783449c4316d242146",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -3040,6 +3040,71 @@
                 }
             ],
             "time": "2025-12-27T19:41:33+00:00"
+        },
+        {
+            "name": "pippa/notification-sdk-laravel",
+            "version": "v1.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/rajoni-pippa/pippa-notification-service-laravel-sdk.git",
+                "reference": "bc3cf83a5967afc3eea578fcd09ec15c1de748db"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rajoni-pippa/pippa-notification-service-laravel-sdk/zipball/bc3cf83a5967afc3eea578fcd09ec15c1de748db",
+                "reference": "bc3cf83a5967afc3eea578fcd09ec15c1de748db",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "illuminate/contracts": "^10.0|^11.0|^12.0",
+                "illuminate/support": "^10.0|^11.0|^12.0",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0|^9.0",
+                "phpunit/phpunit": "^10.0|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "NotificationService": "Pippa\\NotificationSdkLaravel\\Facades\\NotificationService"
+                    },
+                    "providers": [
+                        "Pippa\\NotificationSdkLaravel\\NotificationServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Pippa\\NotificationSdkLaravel\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Rajoni",
+                    "email": "rajoni.pippa@gmail.com"
+                }
+            ],
+            "description": "Notification Service SDK for Laravel — Guzzle, ServiceProvider, Facade",
+            "keywords": [
+                "email",
+                "inapp",
+                "laravel",
+                "notification",
+                "sdk",
+                "sms"
+            ],
+            "support": {
+                "issues": "https://github.com/rajoni-pippa/pippa-notification-service-laravel-sdk/issues",
+                "source": "https://github.com/rajoni-pippa/pippa-notification-service-laravel-sdk/tree/v1.0.3"
+            },
+            "time": "2026-06-01T11:18:34+00:00"
         },
         {
             "name": "psr/clock",

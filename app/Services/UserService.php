@@ -8,6 +8,10 @@ use App\Models\User;
 use App\Models\VaultAssign;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Mail;
+use Pippa\NotificationSdkLaravel\DTOs\Recipient;
+use Pippa\NotificationSdkLaravel\DTOs\TemplateMessage;
+use Pippa\NotificationSdkLaravel\Facades\NotificationService;
+use Pippa\NotificationSdkLaravel\Requests\SendMessageRequest;
 use Spatie\Permission\Models\Role;
 
 use function Laravel\Prompts\error;
@@ -134,22 +138,38 @@ class UserService
             'expires_at' => now()->addMinutes(15),
         ]);
 
-        $data = [
-            'module_name' => 'email_verification',
-            "recipients" => [
-                [
-                    'email' => $user->email,
-                ]
-            ],
-            'dynamic_data' => [
-                'email' => $user->email,
-                'otp' => $otp,
-            ],
+        // $data = [
+        //     'module_name' => 'email_verification',
+        //     "recipients" => [
+        //         [
+        //             'email' => $user->email,
+        //         ]
+        //     ],
+        //     'dynamic_data' => [
+        //         'email' => $user->email,
+        //         'otp' => $otp,
+        //     ],
 
-        ];
+        // ];
+
+        $response = NotificationService::send(
+            new SendMessageRequest([
+                'message' => new TemplateMessage([
+                    'to' => [
+                        Recipient::email($user->email),
+                        // Recipient::phone('+8801700000000'),
+                        // Recipient::userId('user_123'),
+                    ],
+                    'template' => 'vault_email_verify',
+                    'data'     => ['otp' => $otp],
+                ]),
+            ])
+        );
+
+        info("NAAS RESPONSE", ['response' => $response]);
 
 
-        handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
+        // handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
 
         // Mail::to($user->email)->send(new InactiveUserEmailVerification($user));
     }
@@ -173,5 +193,12 @@ class UserService
             ->get(['user_id', 'roles']);
 
         return response()->json($custodians->pluck('user'));
+    }
+
+    public function checkPhoneNumberExistence($phone, $userId)
+    {
+        return User::where('phone', $phone)
+            ->where('id', '!=', $userId)
+            ->exists();
     }
 }

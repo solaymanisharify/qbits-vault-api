@@ -7,14 +7,20 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\AuthService;
 use App\Services\UserService;
+use App\Services\UserVerificationService;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Pippa\NotificationSdkLaravel\DTOs\Recipient;
+use Pippa\NotificationSdkLaravel\DTOs\TemplateMessage;
+use Pippa\NotificationSdkLaravel\Facades\NotificationService;
+use Pippa\NotificationSdkLaravel\Requests\SendMessageRequest;
 
 class AuthController extends Controller
 {
     public function __construct(
         protected AuthService $authService,
-        protected UserService $userService
+        protected UserService $userService,
+        protected UserVerificationService $userVerificationService,
     ) {}
     public function register(Request $request)
     {
@@ -272,78 +278,65 @@ class AuthController extends Controller
 
     public function sendOtpToPhone(Request $request)
     {
+
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^\+?[0-9]{7,15}$/',],
         ]);
 
-        $user = auth()->user();
+        return $this->userVerificationService->sendOtpToPhone($request);
 
-        // Check if phone already exists on another account
-        $phoneExists = User::where('phone', $request->phone)
-            ->where('id', '!=', $user->id)
-            ->exists();
 
-        if ($phoneExists) {
-            return response()->json([
-                'message' => 'This phone number is already associated with another account.',
-            ], 409); // 409 Conflict
-        }
 
-        if ($user->phone === $request->phone && $user->phone_verified_at) {
-            return response()->json([
-                'message' => 'This phone number is already verified on your account.',
-            ], 409);
-        }
+
 
         // Invalidate any existing unused OTPs for this user/purpose
-        Otp::where('user_id', $user->id)
-            ->where('purpose', 'phone_verification')
-            ->whereNull('expires_at')
-            ->delete();
+        // Otp::where('user_id', $user->id)
+        //     ->where('purpose', 'phone_verification')
+        //     ->whereNull('expires_at')
+        //     ->delete();
 
-        $otp       = (string) rand(100000, 999999);
-        $hashedOtp = bcrypt($otp); // Never store plain OTP
+        // $otp       = (string) rand(100000, 999999);
+        // $hashedOtp = bcrypt($otp); // Never store plain OTP
 
-        Otp::create([
-            'user_id'    => $user->id,
-            'otp'        => $hashedOtp,
-            'purpose'    => 'phone_verification',
-            'expires_at' => now()->addMinutes(5),
-        ]);
+        // Otp::create([
+        //     'user_id'    => $user->id,
+        //     'otp'        => $hashedOtp,
+        //     'purpose'    => 'phone_verification',
+        //     'expires_at' => now()->addMinutes(5),
+        // ]);
 
-        $payload = [
-            'module_name' => 'email_verification',
-            'recipients'  => [
-                ['phone' => $request->phone],
-            ],
-            'dynamic_data' => [
-                'otp' => $otp, // Send plain OTP in notification only
-            ],
-        ];
+        // $result = NotificationService::send(
+        //     new SendMessageRequest([
+        //         'message' => new TemplateMessage([
+        //             'to' => [
 
-        $result = handleHttpNewRequest(
-            'POST',
-            env('NAAS_SERVICE_BASE_URL') . '/notification/send',
-            [],
-            $payload
-        );
+        //                 Recipient::phone($request->phone),
+        //                 // Recipient::userId('user_123'),
+        //             ],
+        //             'template' => 'vault_email_verify',
+        //             'data'     => ['otp' => $otp],
+        //         ]),
+        //     ])
+        // );
 
-        if (!$result['success']) {
-            \Log::error('Phone OTP send failed', [
-                'user_id' => $user->id,
-                'phone'   => $request->phone,
-                'result'  => $result,
-            ]);
+        // info("NAAS RESPONSE", ['response' => $result]);
 
-            return response()->json([
-                'message' => 'Failed to send OTP. Please try again.',
-                'error'   => $result['error'] ?? 'Notification service error',
-            ], 502);
-        }
+        // if (!$result->success) {
+        //     \Log::error('Phone OTP send failed', [
+        //         'user_id' => $user->id,
+        //         'phone'   => $request->phone,
+        //         'result'  => $result,
+        //     ]);
 
-        return response()->json([
-            'message' => 'OTP sent successfully to your phone.',
-        ], 200);
+        //     return response()->json([
+        //         'message' => 'Failed to send OTP. Please try again.',
+        //         'error'   => $result->message ?? 'Notification service error',
+        //     ], 502);
+        // }
+
+        // return response()->json([
+        //     'message' => 'OTP sent successfully to your phone.',
+        // ], 200);
     }
 
     public function userVerifcation(Request $request)
