@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 class CashOutService
 {
 
-    public function __construct(protected CashOutRepository $cashOutRepo, protected CashOutBagRepository $cashOutBagRepo, protected UserService $userService, protected CashOutRequiredRepository $cashOutRequired, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected CashOutRepository $cashOutRepo, protected CashOutBagRepository $cashOutBagRepo, protected UserService $userService, protected CashOutRequiredRepository $cashOutRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService) {}
 
     public function getAll()
     {
@@ -37,9 +37,7 @@ class CashOutService
         $vaultId = $data['vault_id'];
 
 
-        $roles = Role::whereIn(DB::raw('LOWER(name)'), ['verifier', 'approver'])
-            ->get()
-            ->keyBy(fn($role) => strtolower($role->name));
+        $roles = $this->roleService->getRoleByRoles(['verifier', 'approver']);
 
         $verifierRole = $roles->get('verifier');
         $approverRole = $roles->get('approver');

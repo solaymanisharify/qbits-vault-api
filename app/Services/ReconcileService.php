@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Vault;
 use App\Models\VaultAssign;
 use App\Repositories\ReconcileRepository;
 use App\Repositories\ReconcileRequiredRepository;
@@ -16,7 +17,7 @@ use function Symfony\Component\String\s;
 class ReconcileService
 {
 
-    public function __construct(protected ReconcileRepository $reconcileRepository, protected UserService $userService, protected ReconcileRequiredRepository $reconcileRequired, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected ReconcileRepository $reconcileRepository, protected UserService $userService, protected ReconcileRequiredRepository $reconcileRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService, protected VaultAssignService $vaultAssignService) {}
 
     public function index($request)
     {
@@ -51,39 +52,37 @@ class ReconcileService
 
     public function create($data)
     {
+        $roles = $this->roleService->getRoleByRoles(['verifier', 'auditor', 'audit initiator']);
 
-        $data["reconcile_tran_id"] = $this->generateReconcileId();
+        $verifierRole = $roles->get('verifier');
+        $auditorRole = $roles->get('auditor');
+        $auditInitiatorRole = $roles->get('audit initiator');
 
-        return DB::transaction(function () use ($data) {
+        if (!$verifierRole || !$auditorRole || !$auditInitiatorRole) {
+            $message = match (true) {
+                !$verifierRole && !$auditorRole && !$auditInitiatorRole => 'Verifier, Auditor, and Audit Initiator roles not found',
+                !$verifierRole                   => 'Verifier role not found',
+                !$auditorRole                   => 'Auditor role not found',
+                !$auditInitiatorRole             => 'Audit Initiator role not found',
+            };
+
+            return errorResponse($message, [
+                'verifier_role' => (bool) $verifierRole,
+                'approver_role' => (bool) $auditorRole,
+                'initiator_role' => (bool) $auditInitiatorRole,
+                'role_status' => false,
+            ], 500);
+        }
+
+
+        return DB::transaction(function () use ($data, $verifierRole, $auditorRole, $auditInitiatorRole) {
+
+            $data["reconcile_tran_id"] = $this->generateReconcileId();
             $vaultId = $data['vault_id'];
 
             $reconcile = $this->reconcileRepository->createReconcile($data);
 
-            $roles = Role::whereIn('name', ['verifier', 'auditor'])->get()->keyBy('name');
-
-
-            $verifierRole = $roles->get('verifier');
-            $auditorRole = $roles->get('Auditor');
-
-            if (!$verifierRole || !$auditorRole) {
-                $message = match (true) {
-                    !$verifierRole && !$auditorRole => 'Verifier and Auditor roles not found',
-                    !$verifierRole                   => 'Verifier role not found',
-                    !$auditorRole                   => 'Auditor role not found',
-                };
-
-                return errorResponse(['message' => $message], [
-                    'verifier_role' => (bool) $verifierRole,
-                    'approver_role' => (bool) $auditorRole,
-                    'role_status' => false,
-                ], 500);
-            }
-
-
-            $assignments = VaultAssign::where('vault_id', $vaultId)
-                ->where('status', 'active')
-                ->get(['user_id', 'roles']);
-
+            $assignments = $this->vaultAssignService->findActiveVaultAssignUserByVaultId($vaultId);
 
             $verifierUserIds = $assignments
                 ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
@@ -93,61 +92,25 @@ class ReconcileService
                 ->filter(fn($a) => in_array($auditorRole->id, $a->roles ?? []))
                 ->pluck('user_id');
 
-            if ($verifierUserIds->isEmpty() || $auditorUserIds->isEmpty()) {
+            $initiatorUserIds = $assignments
+                ->filter(fn($a) => in_array($auditInitiatorRole->id, $a->roles ?? []))
+                ->pluck('user_id');
+
+            if ($verifierUserIds->isEmpty() || $auditorUserIds->isEmpty() || $initiatorUserIds->isEmpty()) {
                 $message = match (true) {
-                    $verifierUserIds->isEmpty() && $auditorUserIds->isEmpty() => 'Verifier and Auditor not found for this vault',
+                    $verifierUserIds->isEmpty() && $auditorUserIds->isEmpty() && $initiatorUserIds->isEmpty() => 'Verifier, Auditor, and Audit Initiator not found for this vault',
                     $verifierUserIds->isEmpty()                                => 'Verifier not found for this vault',
                     $auditorUserIds->isEmpty()                                => 'Auditor not found for this vault',
+                    $initiatorUserIds->isEmpty()                              => 'Audit Initiator not found for this vault',
                 };
 
-                return errorResponse(['message' => $message], [
+                return errorResponse($message, [
                     'verifier_found' => !$verifierUserIds->isEmpty(),
                     'approver_found' => !$auditorUserIds->isEmpty(),
                     'role_status'    => false,
                 ], 500);
             }
 
-            // Helper to get effective users for a permission, considering overrides
-            // $getEffectiveUsers = function ($permissionName) {
-            //     $permission = Permission::findByName($permissionName);
-            //     $permissionId = $permission->id;
-
-            //     // Get users who have the permission via roles or direct assignment (Spatie)
-            //     $usersWithPermission = User::permission($permissionName)->get();
-
-            //     // Get user_ids with override granted=false (to remove)
-            //     $overridesFalse = DB::table('user_permission_overrides')
-            //         ->where('permission_id', $permissionId)
-            //         ->where('granted', false)
-            //         ->pluck('user_id');
-
-            //     // Remove those with granted=false
-            //     $usersWithPermission = $usersWithPermission->whereNotIn('id', $overridesFalse);
-
-            //     // Get user_ids with override granted=true (to add if not already included)
-            //     $overridesTrue = DB::table('user_permission_overrides')
-            //         ->where('permission_id', $permissionId)
-            //         ->where('granted', true)
-            //         ->pluck('user_id');
-
-            //     // Get users for granted=true
-            //     $additionalUsers = User::whereIn('id', $overridesTrue)->get();
-
-            //     // Merge and unique
-            //     $effectiveUsers = $usersWithPermission->concat($additionalUsers)->unique('id');
-
-            //     // Exclude super-admin or admin
-            //     $effectiveUsers = $effectiveUsers->reject(function ($user) {
-            //         return $user->hasRole(['Super Admin', 'Admin']);
-            //     });
-
-            //     return $effectiveUsers;
-            // };
-
-            // Get effective verifiers
-            // $verifiers = $getEffectiveUsers('reconciliation.verify');
-
-            // Create verifier records
             foreach ($verifierUserIds as $verifier) {
                 $this->reconcileRequired->createVerifier([
                     'reconcile_id' => $reconcile->id,
@@ -162,8 +125,8 @@ class ReconcileService
     private function generateReconcileId()
     {
         $prefix = 'REC-';
-        $date = date('Ymd'); // Format: 20260119
-        $number = str_pad(rand(1, 99999), 4, '0', STR_PAD_LEFT); // 5-digit random number
+        $date = date('Ymd');
+        $number = str_pad(rand(1, 99999), 4, '0', STR_PAD_LEFT);
 
         return $prefix . $date . $number;
     }
@@ -233,11 +196,11 @@ class ReconcileService
 
 
         if (!$requiredVerifier) {
-            return response()->json(['error' => 'You are not assigned as a verifier for this Reconcile'], 403);
+            return errorResponse('You are not assigned as a verifier for this Reconcile', 403);
         }
 
         if ($requiredVerifier->verified) {
-            return response()->json(['error' => 'You have already verified this Reconcile'], 400);
+            return errorResponse('You have already verified this Reconcile', 400);
         }
 
         // Log the verification action

@@ -19,6 +19,10 @@ class RoleService
     {
         return $this->roleRepository->find($id);
     }
+    public function getRoleByRoles(array $roles)
+    {
+        return $this->roleRepository->getByRoles($roles);
+    }
     public function create($data)
     {
         try {

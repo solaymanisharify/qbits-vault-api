@@ -14,6 +14,10 @@ class VaultAssignService
     {
         return $this->vaultAssignRepository->create($data);
     }
+    public function findActiveVaultAssignUserByVaultId($vaultId)
+    {
+        return $this->vaultAssignRepository->findActiveVaultAssignUserByVaultId($vaultId);
+    }
     public function getAssignVaultByUserIdAndVaultId(int $userId, int $vaultId)
     {
         return $this->vaultAssignRepository->getAssignVaultByUserIdAndVaultId($userId, $vaultId);

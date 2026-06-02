@@ -68,8 +68,6 @@ Route::middleware('auth:api')->group(function () {
     // role
     Route::apiResource('/roles', RoleController::class);
 
-
-
     // cashout
     Route::apiResource('/cash-out', CashOutController::class);
     Route::get('/pending/cash-out', [CashOutController::class, 'listPending']);

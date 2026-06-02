@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
 class RoleRepository
@@ -27,6 +28,12 @@ class RoleRepository
     public function find($id)
     {
         return $this->model->whereIn('id', (array) $id)->get();
+    }
+    public function getByRoles(array $roles)
+    {
+        return $this->model->whereIn(DB::raw('LOWER(name)'), $roles)
+            ->get()
+            ->keyBy(fn($role) => strtolower($role->name));
     }
     public function create($data)
     {

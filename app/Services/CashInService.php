@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 class CashInService
 {
 
-    public function __construct(protected CashInRepository $cashInRepo, protected UserService $userService, protected CashInRequiredRepository $cashInRequired, protected VaultBagService $vaultBagService) {}
+    public function __construct(protected CashInRepository $cashInRepo, protected UserService $userService, protected CashInRequiredRepository $cashInRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService) {}
 
     public function getAll()
     {
@@ -66,10 +66,7 @@ class CashInService
 
         $bagAmountLimit = 200000;
 
-        $roles = Role::whereIn(DB::raw('LOWER(name)'), ['verifier', 'approver'])
-            ->get()
-            ->keyBy(fn($role) => strtolower($role->name));
-
+        $roles = $this->roleService->getRoleByRoles(['verifier', 'approver']);
 
 
         $verifierRole = $roles->get('verifier');

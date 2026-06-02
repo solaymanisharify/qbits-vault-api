@@ -43,6 +43,7 @@ class UserController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        info($request->role);
         $request->validate([
             'role' => 'required|exists:roles,name',
         ]);

@@ -36,26 +36,14 @@ class ReconcileRepository
         $query->orderBy($sortBy, $sortOrder);
 
         // === Pagination ===
-        $perPage = (int) ($filters['per_page'] ?? 20);
-        $perPage = min(max($perPage, 1), 100); // Limit between 1-100
+        $perPage = (int) ($filters['per_page'] ?? 10);
+        $perPage = min(max($perPage, 1), 100);
 
         $results = $query->paginate($perPage)->appends($filters);
 
         return successResponse(
             "Successfully retrieved cash-ins",
-            [
-                'data' => $results->items(),
-                'pagination' => [
-                    'current_page' => $results->currentPage(),
-                    'per_page' => $results->perPage(),
-                    'total' => $results->total(),
-                    'last_page' => $results->lastPage(),
-                    'from' => $results->firstItem(),
-                    'to' => $results->lastItem(),
-                    'has_more' => $results->hasMorePages(),
-                ],
-                'filters' => array_filter($filters) // Return applied filters
-            ],
+            $results,
             200
         );
     }
