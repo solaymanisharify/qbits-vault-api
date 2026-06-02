@@ -33,8 +33,12 @@ class VaultAuditConfigRepository
             }
         }
 
+        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortOrder = $filters['sort_order'] ?? 'desc';
+        $query->orderBy($sortBy, $sortOrder);
+
         // Pagination
-        $perPage = (int) ($params->get('per_page', 150));
+        $perPage = (int) ($params->get('per_page', 20));
         $results = $query->paginate($perPage)->withQueryString();
 
         return successResponse('Vault audit configs fetched successfully', $results, 200);
