@@ -77,10 +77,11 @@ class ReconcileRepository
     {
         $reconciliation = Reconciliation::where('vault_id', $vaultId)->where('is_locked', true)->first();
 
+
         return successResponse(
             "Successfully retrieved",
             [
-                'is_locked' => $reconciliation->is_locked
+                'is_locked' => $reconciliation?->is_locked ?? false
             ],
             200
         );
