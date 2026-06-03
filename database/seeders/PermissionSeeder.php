@@ -66,6 +66,14 @@ class PermissionSeeder extends Seeder
             'report.daily',
             'report.weekly',
             'report.custom',
+
+            // Settings
+            'setting.view',
+            'setting.config_audit_view',
+            'setting.config_audit_edit',
+            'setting.default_view',
+            'setting.default_edit',
+            'setting.log',
         ];
 
         Role::firstOrCreate(

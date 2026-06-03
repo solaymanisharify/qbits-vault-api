@@ -47,7 +47,12 @@ class VaultRepository
             })
             ->orderBy($sortBy, $sortDir);
 
-        return $perPage ? $query->paginate($perPage) : $query->get();
+        $results = $perPage ? $query->paginate($perPage) : $query->get();
+        return successResponse(
+            "Successfully retrieved vaults",
+            $results,
+            200
+        );
     }
 
     /**

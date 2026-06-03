@@ -15,7 +15,7 @@ class UserRepository
     public function __construct(protected RoleService $roleService) {}
     public function index($request = null)
     {
-        $query = User::with('roles', 'permissions', 'vaultAssignments','defaultVault:id,name')->orderBy('created_at', 'desc');;
+        $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')->orderBy('created_at', 'desc');;
 
         // Search functionality
         $search = null;
@@ -200,7 +200,6 @@ class UserRepository
         $newUser->load('roles');
 
         return successResponse("User created successfully", $newUser, 201);
-
     }
     // Add this method to your RoleService if it doesn't exist
     // public function findMultiple(array $roleIds)
@@ -290,6 +289,7 @@ class UserRepository
     //     ]);
     // }
 
+
     public function update($request, $id)
     {
 
@@ -302,6 +302,9 @@ class UserRepository
         if (isset($data['name']))   $user->name = $data['name'];
         if (isset($data['email']))  $user->email = $data['email'];
         if (isset($data['status'])) $user->status = $data['status'];
+        if (isset($data['default_vault_id'])) $user->default_vault_id = $data['default_vault_id'];
+
+
 
         // 2. Handle Current Address (Nested Data)
         // if (isset($data['current'])) {
