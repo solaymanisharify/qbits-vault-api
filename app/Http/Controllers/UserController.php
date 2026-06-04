@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ForgetPasswordRequest;
 use App\Http\Requests\PermissionRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -215,17 +216,19 @@ class UserController extends Controller
         return $this->userService->archiveUser($userId);
     }
 
-    public function resetPassword($userId)
+    public function forgetPassword(Request $request)
     {
-        return $this->userService->resetPassword($userId);
+        return $this->userService->forgetPassword($request);
     }
+
 
     public function confirmResetPassword(Request $request)
     {
+
         $request->validate([
             'token'    => 'required',
             'email'    => 'required|email',
-            'password' => 'required|min:8|confirmed',
+            'password' => 'required|min:3|confirmed',
         ]);
 
         return $this->userService->confirmResetPassword($request);

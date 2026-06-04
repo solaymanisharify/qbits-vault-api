@@ -7,7 +7,10 @@ use App\Models\Otp;
 use App\Models\User;
 use App\Models\VaultAssign;
 use App\Repositories\UserRepository;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 use Pippa\NotificationSdkLaravel\DTOs\Recipient;
 use Pippa\NotificationSdkLaravel\DTOs\TemplateMessage;
 use Pippa\NotificationSdkLaravel\Facades\NotificationService;
@@ -22,6 +25,10 @@ class UserService
     public function findById($id)
     {
         return $this->userRepository->findById($id);
+    }
+    public function findByEmail($email)
+    {
+        return $this->userRepository->findByEmail($email);
     }
     public function index($request = null)
     {
@@ -72,14 +79,34 @@ class UserService
         return successResponse("User archived successfully", $user, 200);
     }
 
-    public function resetPassword($userId)
+    public function forgetPassword($request)
     {
-        $user = $this->findById($userId);
+        info($request);
+        $request->validate([
+            'email' => 'required|string|email',
+        ]);
+
+        $email = $request->email;
+
+        $domain = substr(strrchr($email, "@"), 1);
+        if (!checkdnsrr($domain, "MX")) {
+            return errorResponse("The email domain does not exist or cannot receive mail.", [], 422);
+        }
+
+        $user = $this->findByEmail($email);
+
+        if (!$user) {
+            return errorResponse("Email not matched", [], 404);
+        }
+
+        if ($user->status !== 'active') {
+            return errorResponse("Your account is inactive. Please contact support.", [], 403);
+        }
 
         // Generate token — store in password_reset_tokens table
         $token = \Illuminate\Support\Str::random(64);
 
-        \DB::table('password_reset_tokens')->updateOrInsert(
+        DB::table('password_reset_tokens')->updateOrInsert(
             ['email' => $user->email],
             [
                 'token'      => hash('sha256', $token),
@@ -87,37 +114,49 @@ class UserService
             ]
         );
 
-        // Send email
-        \Mail::to($user->email)->send(new \App\Mail\PasswordResetMail($user, $token));
+        $resetUrl = config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
 
-        return response()->json(['message' => 'Password reset email sent']);
+        $response = NotificationService::send(
+            new SendMessageRequest([
+                'message' => new TemplateMessage([
+                    'to' => [
+                        Recipient::email($user->email),
+                    ],
+                    'template' => 'vault_forget_password',
+                    'data'     => [
+                        'name' => $user->name,
+                        'resetUrl' => $resetUrl,
+                    ],
+                ]),
+            ])
+        );
+
+        return successResponse("Password reset email sent successfully", [], 200);
     }
 
     public function confirmResetPassword($request)
     {
 
-        $record = \DB::table('password_reset_tokens')
+        $record = DB::table('password_reset_tokens')
             ->where('email', $request->email)
             ->first();
 
-        // Direct token comparison — no hashing
-        if (!$record || $record->token !== $request->token) {
-            return response()->json(['message' => 'Invalid token'], 422);
+        if (!$record || $record->token !== hash('sha256', $request['token'])) {
+            return errorResponse("Invalid token", [], 422);
         }
 
         if (now()->diffInMinutes($record->created_at) > 60) {
-            return response()->json(['message' => 'Token expired'], 422);
+            return errorResponse("Token has expired", [], 422);
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
 
-        // Direct bcrypt — no Hash facade (JWT compatible)
-        $user->password = bcrypt($request->password);
+        $user->password = Hash::make($request->password);
         $user->save();
 
-        \DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 
-        return response()->json(['message' => 'Password reset successfully']);
+        return successResponse("Password reset successfully", [], 200);
     }
 
     public function notVerifiedUserEmailVerification($user)
@@ -137,20 +176,6 @@ class UserService
             'purpose'    => 'email_verification',
             'expires_at' => now()->addMinutes(15),
         ]);
-
-        // $data = [
-        //     'module_name' => 'email_verification',
-        //     "recipients" => [
-        //         [
-        //             'email' => $user->email,
-        //         ]
-        //     ],
-        //     'dynamic_data' => [
-        //         'email' => $user->email,
-        //         'otp' => $otp,
-        //     ],
-
-        // ];
 
         $response = NotificationService::send(
             new SendMessageRequest([

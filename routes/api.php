@@ -26,6 +26,8 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/phone/verify', 'verifyPhoneOtp');
     Route::post('/phone/send-otp', 'sendOtpToPhone');
     Route::post('/user/verification', 'userVerifcation');
+    Route::post('/forget-password', [UserController::class, 'forgetPassword']);
+    Route::post('/reset-password/confirm', [UserController::class, 'confirmResetPassword']);
 });
 
 Route::middleware(['auth:api', 'check.active'])->group(function () {
@@ -50,10 +52,6 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
 
         Route::put('/{userId}/toggle-status', [UserController::class, 'toggleUserStatus']);
         Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
-        Route::post('/{userId}/reset-password', [UserController::class, 'resetPassword']);
-        // Public route — no auth middleware
-        Route::post('/reset-password/confirm', [UserController::class, 'confirmResetPassword']);
-
         Route::get('/{id}/download-id', [UserController::class, 'downloadId']);
 
         // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
