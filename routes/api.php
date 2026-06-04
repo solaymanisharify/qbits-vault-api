@@ -40,6 +40,7 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
         Route::put('/{userId}',    [UserController::class, 'update']);
         Route::delete('/{userId}', [UserController::class, 'destroy']);
         Route::post('/change-password/{userId}', [AuthController::class, 'changePassword']);
+        Route::post('/new-password/{userId}', [AuthController::class, 'superAdminChangeUserPassword']);
         Route::post('/{userId}/assign-role', [UserController::class, 'assignRole']);
         Route::post('/{userId}/assign-permission', [UserController::class, 'assignPermission']);
         Route::put('/{userId}/update-permissions', [UserController::class, 'UpdatePermission']);

@@ -101,4 +101,12 @@ class AuthService
         $user->save();
         return $user;
     }
+    public function superAdminChangeUserPassword($newPassword, $userId)
+    {
+
+        $user = $this->userRepository->findById($userId);
+        $user->password = Hash::make($newPassword);
+        $user->save();
+        return $user;
+    }
 }

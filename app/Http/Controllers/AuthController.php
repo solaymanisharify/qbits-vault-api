@@ -57,6 +57,26 @@ class AuthController extends Controller
         $user = $this->authService->changePassword($request);
         return successResponse([], "Password changed successfully", 200);
     }
+    public function superAdminChangeUserPassword(Request $request, $id)
+    {
+        $superadmin = auth()->user()->hasRole('super-admin');
+
+        if (!$superadmin) {
+            return errorResponse("You are not authorized to perform this action", [], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'newPassword' => 'required|string|min:6',
+        ]);
+
+
+        if ($validator->fails()) {
+            return errorResponse("Validation error", $validator->errors(), 422);
+        }
+
+        $this->authService->superAdminChangeUserPassword($request, $id);
+        return successResponse([], "Password changed successfully", 200);
+    }
 
     public function verifyEmail(Request $request)
     {

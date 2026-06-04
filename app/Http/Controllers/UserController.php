@@ -236,6 +236,8 @@ class UserController extends Controller
     {
         $user = User::with('roles', 'vaultAssignments')->findOrFail($id);
 
+        info($user);
+
         // Convert images to base64 directly from storage
         $profileImg = $this->imageToBase64($user->img);
         $nidFront   = $this->imageToBase64($user->nid_front_img);
