@@ -21,6 +21,7 @@ class Vault extends Model
         'verifiers',
         'status',
         'bag_balance_limit',
+        'bag_min_bal_limit',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Vault extends Model
         'last_cash_out' => 'array',
         'verifiers' => 'array',
         'status' => 'array',
+        'bag_min_bal_limit' => 'array',
     ];
 
 
@@ -37,5 +39,4 @@ class Vault extends Model
     {
         return $this->hasMany(VaultBag::class);
     }
-    
 }

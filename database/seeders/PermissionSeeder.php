@@ -63,6 +63,7 @@ class PermissionSeeder extends Seeder
             'permission.edit',
 
             // Reports
+            'report.view',
             'report.daily',
             'report.weekly',
             'report.custom',

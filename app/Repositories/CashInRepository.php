@@ -32,9 +32,9 @@ class CashInRepository
         ]);
 
         // === Role-based access control ===
-        // if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
-        //     $query->where('user_id', auth()->id());
-        // }
+        if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
+            $query->where('user_id', auth()->id());
+        }
 
         // === Search by bag_barcode (indexed column) ===
         if (!empty($filters['search'])) {

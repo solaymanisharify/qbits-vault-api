@@ -104,11 +104,7 @@ class ReconcileService
                     $initiatorUserIds->isEmpty()                              => 'Audit Initiator not found for this vault',
                 };
 
-                return errorResponse($message, [
-                    'verifier_found' => !$verifierUserIds->isEmpty(),
-                    'approver_found' => !$auditorUserIds->isEmpty(),
-                    'role_status'    => false,
-                ], 500);
+                throw new \Exception($message);
             }
 
             foreach ($verifierUserIds as $verifier) {

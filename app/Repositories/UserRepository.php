@@ -13,11 +13,61 @@ use Spatie\Permission\Models\Permission;
 class UserRepository
 {
     public function __construct(protected RoleService $roleService) {}
+    // public function index($request = null)
+    // {
+    //     $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')->orderBy('created_at', 'desc');;
+
+    //     // Search functionality
+    //     $search = null;
+    //     if (is_array($request) && isset($request['search'])) {
+    //         $search = $request['search'];
+    //     } elseif (is_object($request) && method_exists($request, 'input')) {
+    //         $search = $request->input('search');
+    //     }
+
+    //     if ($search) {
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('name', 'like', "%{$search}%")
+    //                 ->orWhere('email', 'like', "%{$search}%");
+    //         });
+    //     }
+
+    //     // Pagination
+    //     $perPage = 15; // Default
+    //     if (is_array($request) && isset($request['per_page'])) {
+    //         $perPage = $request['per_page'];
+    //     } elseif (is_object($request) && method_exists($request, 'input')) {
+    //         $perPage = $request->input('per_page', 15);
+    //     }
+
+    //     $users = $query->paginate($perPage);
+
+
+    //     return $users;
+    // }
+
     public function index($request = null)
     {
-        $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')->orderBy('created_at', 'desc');;
+        $authUser = auth()->user();
+        $isSuperAdmin = $authUser->hasRole('super-admin');
+        $isAdmin      = $authUser->hasRole('admin');
 
-        // Search functionality
+        // Non-admin, non-superadmin → return only their own data
+        if (!$isSuperAdmin && !$isAdmin) {
+            return User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')
+                ->where('id', $authUser->id)
+                ->paginate(1);
+        }
+
+        $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')
+            ->orderBy('created_at', 'desc');
+
+        // Admin → exclude superadmin users
+        if ($isAdmin && !$isSuperAdmin) {
+            $query->whereDoesntHave('roles', fn($q) => $q->where('name', 'super-admin'));
+        }
+
+        // Search
         $search = null;
         if (is_array($request) && isset($request['search'])) {
             $search = $request['search'];
@@ -33,17 +83,14 @@ class UserRepository
         }
 
         // Pagination
-        $perPage = 15; // Default
+        $perPage = 15;
         if (is_array($request) && isset($request['per_page'])) {
             $perPage = $request['per_page'];
         } elseif (is_object($request) && method_exists($request, 'input')) {
             $perPage = $request->input('per_page', 15);
         }
 
-        $users = $query->paginate($perPage);
-
-
-        return $users;
+        return $query->paginate($perPage);
     }
 
     public function findById(int $id)
@@ -53,7 +100,7 @@ class UserRepository
 
     public function show($id)
     {
-        $user = User::with(['roles.permissions', 'permissions', 'vaultAssignments.vault:id,name'])->findOrFail($id);
+        $user = User::with(['roles.permissions', 'permissions', 'vaultAssignments.vault:id,name,bag_balance_limit,bag_min_bal_limit'])->findOrFail($id);
 
         $effectivePermissions = $user->getEffectivePermissions();
 

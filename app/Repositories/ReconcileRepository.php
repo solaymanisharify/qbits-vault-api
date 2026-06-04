@@ -13,9 +13,9 @@ class ReconcileRepository
         $query = Reconciliation::query();
 
         $query->with([
-            'requiredVerifiers.user',
-            'requiredApprovers.user',
-            'startedBy',
+            'requiredVerifiers.user:id,name,email',
+            'requiredApprovers.user:id,name,email',
+            'startedBy:id,name,email',
             'completedBy',
             'varianceBags:id,vault_id,barcode,rack_number',
             'vault:id,vault_code,name',

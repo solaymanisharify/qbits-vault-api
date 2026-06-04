@@ -19,6 +19,7 @@ return new class extends Migration
             $table->integer('bag_limit')->nullable();
             $table->decimal('balance', 15, 2)->default(0);
             $table->decimal('bag_balance_limit', 15, 2)->default(200000.00);
+            $table->decimal('bag_min_bal_limit', 15, 2)->default(0.00);
             $table->string('total_racks')->nullable();
             $table->json('total_bags')->nullable();
             $table->json('last_cash_in')->nullable();

@@ -23,6 +23,8 @@ class VaultRepository
                 'name',
                 'address',
                 'balance',
+                'bag_min_bal_limit',
+                'bag_balance_limit',
                 'total_racks',
                 'total_bags',
                 'last_cash_in',

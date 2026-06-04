@@ -146,7 +146,7 @@ class CashInService
 
         return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds) {
             $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
-            // find the users who are verifier and approver and assign to the cash-in
+
             $cashIn = $this->cashInRepo->create($data);
 
             // Create verifier records
@@ -330,14 +330,6 @@ class CashInService
             return response()->json(['error' => 'You have already approvered this CashIn'], 400);
         }
 
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
-
         // Mark as verified in required table
         $requiredApprover->update([
             'approved' => true,
@@ -364,10 +356,10 @@ class CashInService
 
                 /// make in cashIns relations bags there update the data amount will be add with old number do it
                 if ($bag) {
-                    $bag->current_amount += $cashIn->cash_in_amount; // add to existing
+                    $bag->current_amount += $cashIn->cash_in_amount;
                     $bag->last_cash_in_amount = $cashIn->cash_in_amount;
                     $bag->last_cash_in_at = now();
-                    $bag->last_cash_in_by = $cashIn->user_id; // or auth()->id()
+                    $bag->last_cash_in_by = $cashIn->user_id;
                     $bag->last_cash_in_tran_id = $cashIn->tran_id;
 
                     // Merge denominations
@@ -397,18 +389,18 @@ class CashInService
                     $bag->total_successful_deposits += 1;
 
                     $bag->save();
+
+                    // Update vault balance
+                    $vault = $bag->vault;
+
+                    info($vault);
+
+                    $vault->last_cash_in = now();
+                    $vault->save();
                 }
             }
         }
 
-        // Handle approve/reject (only if user has permission)
-        // if ($action === 'approve' && $user->can('cash-in.approve')) {
-        //     $cashIn->status = 'approved';
-        //     $cashIn->save();
-        // } elseif ($action === 'reject' && $user->can('cash-in.reject')) {
-        //     $cashIn->status = 'rejected';
-        //     $cashIn->save();
-        // }
 
         return response()->json([
             'message' => ' recorded successfully',
