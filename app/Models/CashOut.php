@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class CashOut extends Model
 {
-    protected $fillable = ["user_id", "cash_in_id","vault_id", "tran_id", "cash_out_amount", "request_amount", "verifier_status", "approver_status", "note"];
+    protected $fillable = ["user_id", "cash_in_id","vault_id", "tran_id", "cash_out_amount", "request_amount", "verifier_status", "approver_status", "note",'completed_at'];
 
     public function user()
     {

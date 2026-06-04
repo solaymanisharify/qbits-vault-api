@@ -39,4 +39,9 @@ class Vault extends Model
     {
         return $this->hasMany(VaultBag::class);
     }
+
+    public function assignments()
+    {
+        return $this->hasMany(VaultAssign::class);
+    }
 }

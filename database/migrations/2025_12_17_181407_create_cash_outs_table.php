@@ -24,6 +24,7 @@ return new class extends Migration
             $table->enum('approver_status', ['pending', 'approved', 'completed', 'cancelled'])
                 ->default('pending');
             $table->text('note')->nullable();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
             $table->index('verifier_status');

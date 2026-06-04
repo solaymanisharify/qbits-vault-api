@@ -250,6 +250,7 @@ class CashOutService
             $vault->save();
 
             $cashOut->approver_status = 'approved';
+            $cashOut->completed_at = now();
             $cashOut->save();
         }
 

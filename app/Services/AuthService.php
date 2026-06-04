@@ -40,6 +40,13 @@ class AuthService
         ]);
 
         $credentials = $request->only('email', 'password');
+        $user = \App\Models\User::where('email', $request->email)->first();
+
+        if ($user) {
+            // Check if the password actually matches the database hash manually
+            $check = \Illuminate\Support\Facades\Hash::check($request->password, $user->password);
+            info('Manual hash match check: ' . ($check ? 'TRUE' : 'FALSE'));
+        }
 
         $token = Auth::attempt($credentials);
         if (!$token) {
@@ -103,9 +110,8 @@ class AuthService
     }
     public function superAdminChangeUserPassword($newPassword, $userId)
     {
-
         $user = $this->userRepository->findById($userId);
-        $user->password = Hash::make($newPassword);
+        $user->password = Hash::make($newPassword["newPassword"]);
         $user->save();
         return $user;
     }

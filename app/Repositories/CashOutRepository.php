@@ -18,7 +18,6 @@ class CashOutRepository
     {
         $query = $this->model->newQuery();
 
-        // === Eager load relationships to avoid N+1 queries ===
         $query->with([
             'user:id,name,email',
             'vault:id,vault_code,name',
@@ -26,16 +25,17 @@ class CashOutRepository
             'requiredVerifiers.user:id,name,email',
             'requiredApprovers.user:id,name,email',
             'custodian.custodian:id,name,email',
-            // // 'branch:id,name,code',
-            // 'items' => function ($q) {
-            //     $q->select('id', 'cash_in_id', 'denomination', 'quantity', 'amount');
-            // }
         ]);
 
-        // === Role-based access control ===
-        // if (!auth()->user()->hasRole(['super_admin', 'admin'])) {
-        //     $query->where('user_id', auth()->id());
-        // }
+        $user = auth()->user();
+
+        if (!$user->hasRole('super-admin')) {
+
+            $query->whereHas('vault.assignments', function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->where('status', 'active');
+            });
+        }
 
         // === Search by bag_barcode (indexed column) ===
         if (!empty($filters['search'])) {

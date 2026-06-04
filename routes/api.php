@@ -9,6 +9,7 @@ use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReconcileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VaultAuditConfigController;
@@ -53,6 +54,8 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
         Route::put('/{userId}/toggle-status', [UserController::class, 'toggleUserStatus']);
         Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
         Route::get('/{id}/download-id', [UserController::class, 'downloadId']);
+
+        Route::get('/{id}/archive-check', [UserController::class, 'archiveCheck']);
 
         // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
     });
@@ -110,6 +113,9 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
 
     // ledger data
     Route::get('/cash-in/{id}/ledger', [LedgerController::class, 'getLedgerData']);
+
+    // report
+    Route::get('/reports', [ReportController::class, 'getLedgerReport']);
 
     // Activity Logs
     // make group route here

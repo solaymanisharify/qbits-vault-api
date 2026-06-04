@@ -54,7 +54,7 @@ class AuthController extends Controller
             return errorResponse("Validation error", $validator->errors(), 422);
         }
 
-        $user = $this->authService->changePassword($request);
+        $this->authService->changePassword($request);
         return successResponse([], "Password changed successfully", 200);
     }
     public function superAdminChangeUserPassword(Request $request, $id)
@@ -74,7 +74,7 @@ class AuthController extends Controller
             return errorResponse("Validation error", $validator->errors(), 422);
         }
 
-        $this->authService->superAdminChangeUserPassword($request, $id);
+        $this->authService->superAdminChangeUserPassword($request->all(), $id);
         return successResponse([], "Password changed successfully", 200);
     }
 

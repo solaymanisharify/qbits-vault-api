@@ -216,6 +216,16 @@ class UserController extends Controller
         return $this->userService->archiveUser($userId);
     }
 
+    public function archiveCheck($id)
+    {
+        if (!auth()->user()->hasRole('super-admin') && !auth()->user()->hasRole('admin')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $checkData = $this->userService->checkArchiveEligibility($id);
+        return response()->json($checkData, 200);
+    }
+
     public function forgetPassword(Request $request)
     {
         return $this->userService->forgetPassword($request);
@@ -238,8 +248,6 @@ class UserController extends Controller
     public function downloadId($id)
     {
         $user = User::with('roles', 'vaultAssignments')->findOrFail($id);
-
-        info($user);
 
         // Convert images to base64 directly from storage
         $profileImg = $this->imageToBase64($user->img);

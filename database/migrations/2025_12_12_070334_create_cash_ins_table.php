@@ -24,6 +24,7 @@ return new class extends Migration
                 ->default('pending');
             $table->enum('approver_status', ['pending', 'approved', 'completed', 'cancelled'])
                 ->default('pending');
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
             // Optional indexes for better performance

@@ -350,6 +350,7 @@ class CashInService
 
             if ($result['success'] === true) {
                 $cashIn->approver_status = 'approved';
+                $cashIn->completed_at = now();
                 $cashIn->save();
 
                 $bag = $cashIn->bags;
@@ -393,10 +394,10 @@ class CashInService
                     // Update vault balance
                     $vault = $bag->vault;
 
-                    info($vault);
-
                     $vault->last_cash_in = now();
                     $vault->save();
+
+
                 }
             }
         }

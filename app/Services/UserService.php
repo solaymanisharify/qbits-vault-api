@@ -81,7 +81,7 @@ class UserService
 
     public function forgetPassword($request)
     {
-        info($request);
+       
         $request->validate([
             'email' => 'required|string|email',
         ]);
@@ -191,8 +191,6 @@ class UserService
             ])
         );
 
-        info("NAAS RESPONSE", ['response' => $response]);
-
 
         // handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
 
@@ -207,8 +205,6 @@ class UserService
         if (!$custodianRoleId) {
             return errorResponse(['message' => 'Custodian role not found'], [], 404);
         }
-
-        info($custodianRoleId);
 
 
         $custodians = VaultAssign::where('vault_id', $vaultId)
@@ -225,5 +221,50 @@ class UserService
         return User::where('phone', $phone)
             ->where('id', '!=', $userId)
             ->exists();
+    }
+
+    private function getTrackingMatrices()
+    {
+        return [
+            ['table' => 'cash_in_required_approvers',  'column' => 'approved', 'label' => 'Cash In Approval Queue'],
+            ['table' => 'cash_in_required_verifiers',  'column' => 'verified', 'label' => 'Cash In Verification Queue'],
+            ['table' => 'cashout_required_approvers',  'column' => 'approved', 'label' => 'Cash Out Approval Queue'],
+            ['table' => 'cashout_required_verifiers',  'column' => 'verified', 'label' => 'Cash Out Verification Queue'],
+            ['table' => 'reconcile_required_approvers', 'column' => 'approved', 'label' => 'Reconciliation Approval Queue'],
+            ['table' => 'reconcile_required_verifiers', 'column' => 'verified', 'label' => 'Reconciliation Verification Queue'],
+        ];
+    }
+
+    public function checkArchiveEligibility($userId)
+    {
+        $matrices = $this->getTrackingMatrices();
+        $pendingTasks = [];
+
+        foreach ($matrices as $matrix) {
+            $records = DB::table($matrix['table'])
+                ->where('user_id', $userId)
+                ->where($matrix['column'], false) // Uncompleted transaction locks
+                ->get();
+
+            foreach ($records as $item) {
+                $pendingTasks[] = [
+                    'table' => $matrix['table'],
+                    'id'    => $item->id,
+                    'type'  => $matrix['label']
+                ];
+            }
+        }
+
+        // Fetch valid fallback users with identical permissions to accept the workspace shift
+        $fallbackUsers = User::where('id', '!=', $userId)
+            ->where('status', 'active')
+            ->select('id', 'name', 'email')
+            ->get();
+
+        return [
+            'can_archive'   => empty($pendingTasks),
+            'pending_tasks' => $pendingTasks,
+            'fallback_users' => $fallbackUsers
+        ];
     }
 }
