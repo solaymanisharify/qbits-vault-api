@@ -28,7 +28,7 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/user/verification', 'userVerifcation');
 });
 
-Route::middleware('auth:api')->group(function () {
+Route::middleware(['auth:api', 'check.active'])->group(function () {
 
     // User
     Route::prefix('users')->group(function () {
