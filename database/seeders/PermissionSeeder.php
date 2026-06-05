@@ -25,15 +25,19 @@ class PermissionSeeder extends Seeder
             'vault.delete',
 
             // Cash In
-            'cash-in.create',
+            'cash-in.request',
+            'cash-in.edit',
+            'cash-in.delete',
             'cash-in.view',
             'cash-in.verify',
             'cash-in.approve',
             'cash-in.reject',
-            'cash-in.request',
 
             // Cash Out
             'cash-out.create',
+            'cash-out.view',
+            'cash-out.edit',
+            'cash-out.delete',
             'cash-out.view',
             'cash-out.verify',
             'cash-out.approve',
@@ -41,7 +45,7 @@ class PermissionSeeder extends Seeder
             // Reconciliations
             'reconciliation.view',
             'reconciliation.create',
-            'reconciliation.export',
+            'reconciliation.reschedule',
             'reconciliation.read',
             'reconciliation.verify',
             'reconciliation.approve',
