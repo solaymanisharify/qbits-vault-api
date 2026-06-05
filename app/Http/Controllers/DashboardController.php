@@ -9,9 +9,16 @@ class DashboardController extends Controller
 {
     public function __construct(protected DashboardService $dashboardService) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        $data = $this->dashboardService->index();
+        info($request->all());
+        $timeframe = $request['timeframe'];
+        $vaultId = $request['selectedVault'];
+
+        info($timeframe);
+        info($vaultId);
+
+        $data = $this->dashboardService->index($timeframe, $vaultId);
 
         return successResponse("Successfully fetched dashboard data", $data, 200);
     }

@@ -24,7 +24,7 @@ class ReportService
         $timeline = is_object($request) ? $request->query('timeline') : ($request['timeline'] ?? null);
         $tranId = is_object($request) ? $request->query('tran_id') : ($request['tran_id'] ?? null);
         $vaultNameSearch = is_object($request) ? $request->query('vault_name') : ($request['vault_name'] ?? null);
-        
+
         $perPage = is_object($request) ? $request->query('per_page', 15) : ($request['per_page'] ?? 15);
 
         // Fetch current authenticated user structural profile
@@ -33,13 +33,13 @@ class ReportService
         // 2. Base Cash In Query Component (Has a real bag_id)
         $cashInQuery = DB::table('cash_ins')
             ->select(
-                'id', 
-                'tran_id', 
-                'completed_at', 
-                'vault_id', 
-                'bag_id', 
-                DB::raw('NULL as debit'), 
-                'cash_in_amount as credit', 
+                'id',
+                'tran_id',
+                'completed_at',
+                'vault_id',
+                'bag_id',
+                DB::raw('NULL as debit'),
+                'cash_in_amount as credit',
                 'approver_status',
                 DB::raw("'cash_in' as transaction_type")
             )
@@ -48,13 +48,13 @@ class ReportService
         // 3. Base Cash Out Query Component (Uses NULL placeholder for bag_id to match columns)
         $cashOutQuery = DB::table('cash_outs')
             ->select(
-                'id', 
-                'tran_id', 
-                'completed_at', 
-                'vault_id', 
-                DB::raw('NULL as bag_id'), 
-                'request_amount as debit', 
-                DB::raw('NULL as credit'), 
+                'id',
+                'tran_id',
+                'completed_at',
+                'vault_id',
+                DB::raw('NULL as bag_id'),
+                'request_amount as debit',
+                DB::raw('NULL as credit'),
                 'approver_status',
                 DB::raw("'cash_out' as transaction_type")
             )
@@ -105,7 +105,7 @@ class ReportService
         }
 
         if ($vaultNameSearch) {
-            $masterQuery->whereIn('vault_id', function($query) use ($vaultNameSearch) {
+            $masterQuery->whereIn('vault_id', function ($query) use ($vaultNameSearch) {
                 $query->select('id')
                     ->from('vaults')
                     ->where('name', 'LIKE', "%{$vaultNameSearch}%");
@@ -123,7 +123,7 @@ class ReportService
 
         // 10. Hydrate relationships dynamically (Batch-loading optimized)
         $itemsCollection = collect($paginatedLedger->items());
-        
+
         $vaultIds = $itemsCollection->pluck('vault_id')->filter()->unique();
         $vaults = Vault::whereIn('id', $vaultIds)->select('id', 'name')->get()->keyBy('id');
 
@@ -140,7 +140,7 @@ class ReportService
         // Merge all unique VaultBag primary keys needed for the query execution
         $cashOutBagIds = $cashOutBagsMap->flatten()->pluck('bags_id');
         $allBagIds = $cashInBagIds->concat($cashOutBagIds)->unique()->filter();
-        
+
         // Accurate column tracking targeting your barcode property
         $bags = VaultBag::whereIn('id', $allBagIds)
             ->select('id', 'barcode')
@@ -150,7 +150,7 @@ class ReportService
         // Map the relationship models back onto each row securely
         $finalLedgerItems = $itemsCollection->map(function ($row) use ($vaults, $bags, $cashOutBagsMap) {
             $row->vault = $vaults->get($row->vault_id) ?? null;
-            
+
             // Re-instantiate unified bags array structure for structural frontend mapping
             $assignedBags = collect();
 
@@ -171,7 +171,7 @@ class ReportService
             return $row;
         });
 
-        // 11. Package full payload for clean frontend transmission
+
         $result = [
             'summary' => [
                 'total_credits' => (float)$totalCredits,
@@ -180,11 +180,16 @@ class ReportService
             ],
             'ledger' => $finalLedgerItems,
             'pagination' => [
-                'current_page' => $paginatedLedger->currentPage(),
-                'last_page' => $paginatedLedger->lastPage(),
-                'per_page' => $paginatedLedger->perPage(),
-                'total_records' => $paginatedLedger->total(),
-            ]
+                'current_page'  => $paginatedLedger->currentPage(),
+                'per_page'      => $paginatedLedger->perPage(),
+                'total'         => $paginatedLedger->total(),
+                'last_page'     => $paginatedLedger->lastPage(),
+                'from'          => $paginatedLedger->firstItem(),
+                'to'            => $paginatedLedger->lastItem(),
+                'next_page_url' => $paginatedLedger->nextPageUrl(),
+                'prev_page_url' => $paginatedLedger->previousPageUrl(),
+                'links'         => $paginatedLedger->linkCollection()->toArray(),
+            ],
         ];
 
         return successResponse("Successfully fetched ledger report", $result, 200);

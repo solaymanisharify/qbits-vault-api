@@ -6,13 +6,14 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
         // Reset cached permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // === Define All Permissions ===
         $permissions = [
@@ -64,9 +65,6 @@ class PermissionSeeder extends Seeder
 
             // Reports
             'report.view',
-            'report.daily',
-            'report.weekly',
-            'report.custom',
 
             // Settings
             'setting.view',
@@ -77,48 +75,39 @@ class PermissionSeeder extends Seeder
             'setting.log',
         ];
 
-        Role::firstOrCreate(
-            ['name' => 'admin'],
-            ['name' => 'verifier'],
-            ['name' => 'approver'],
-            ['name' => 'bag create'],
-            ['name' => 'custodian'],
-        );
+        $roles = [
+            'super-admin',
+            'admin',
+            'verifier',
+            'approver',
+            'bag create',
+            'custodian',
+            'auditor',
+            'audit initiator',
+        ];
+
+        foreach ($roles as $roleName) {
+            Role::firstOrCreate(['name' => $roleName]);
+        }
 
         // Create permissions
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        // === Create Default Super Admin User ===
         $superAdminUser = User::firstOrCreate(
             ['email' => 'super@admin.com'],
             [
                 'name'     => 'Super Admin',
                 'password' => bcrypt('123'),
+                'status'   => 'active',
+                'verified' => true,
             ]
         );
 
-        // Assign ALL permissions directly to the user (User-wise)
         $superAdminUser->syncPermissions(Permission::all());
 
         $superAdminRole = Role::firstOrCreate(['name' => 'super-admin']);
         $superAdminUser->assignRole($superAdminRole);
-
-        // Optional: You can create more users with specific permissions here
-        // Example:
-        /*
-        $cashier = User::firstOrCreate(
-            ['email' => 'cashier@example.com'],
-            ['name' => 'Cashier User', 'password' => bcrypt('123')]
-        );
-        $cashier->syncPermissions([
-            'cash-in.create',
-            'cash-in.view',
-            'cash-out.create',
-            'cash-out.view',
-            'vault.view',
-        ]);
-        */
     }
 }
