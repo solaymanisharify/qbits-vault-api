@@ -13,38 +13,6 @@ use Spatie\Permission\Models\Permission;
 class UserRepository
 {
     public function __construct(protected RoleService $roleService) {}
-    // public function index($request = null)
-    // {
-    //     $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')->orderBy('created_at', 'desc');;
-
-    //     // Search functionality
-    //     $search = null;
-    //     if (is_array($request) && isset($request['search'])) {
-    //         $search = $request['search'];
-    //     } elseif (is_object($request) && method_exists($request, 'input')) {
-    //         $search = $request->input('search');
-    //     }
-
-    //     if ($search) {
-    //         $query->where(function ($q) use ($search) {
-    //             $q->where('name', 'like', "%{$search}%")
-    //                 ->orWhere('email', 'like', "%{$search}%");
-    //         });
-    //     }
-
-    //     // Pagination
-    //     $perPage = 15; // Default
-    //     if (is_array($request) && isset($request['per_page'])) {
-    //         $perPage = $request['per_page'];
-    //     } elseif (is_object($request) && method_exists($request, 'input')) {
-    //         $perPage = $request->input('per_page', 15);
-    //     }
-
-    //     $users = $query->paginate($perPage);
-
-
-    //     return $users;
-    // }
 
     public function index($request = null)
     {
@@ -60,6 +28,7 @@ class UserRepository
         }
 
         $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')
+            ->where('status', '!=', 'archived')
             ->orderBy('created_at', 'desc');
 
         // Admin → exclude superadmin users
@@ -116,7 +85,6 @@ class UserRepository
     }
     public function create($data)
     {
-        // info($data);
         return User::create([
             'name' => $data->name,
             'email' => $data->email,

@@ -13,9 +13,22 @@ class ActivityLogController extends Controller
     public function __construct(protected VaultBagService $vaultBagService, protected ActivityLoggerService $cashInService) {}
     public function index(Request $request): JsonResponse
     {
-
+        $user = auth()->user();
         $query = ActivityLog::query()->orderByDesc('created_at');
 
+        $hasGlobalViewAccess = $user->hasRole('super-admin') || $user->hasRole('admin');
+
+        if (!$hasGlobalViewAccess) {
+            // Regular users are strictly hard-locked to their own logs
+            $query->forUser($user->id);
+        } else {
+            // Admins can optionally filter by a targeted user_id if supplied
+            if ($userId = $request->user_id) {
+                $query->forUser($userId);
+            }
+        }
+
+        // 2. Structural Dynamic Parameters Filtering
         if ($module = $request->module) {
             $query->where('module', $module);
         }
@@ -24,12 +37,8 @@ class ActivityLogController extends Controller
             $query->where('event', $event);
         }
 
-        if ($request->filled('subject_type') && $request->filled('subject_id')) {
+        if ($request->filled(['subject_type', 'subject_id'])) {
             $query->forSubject($request->subject_type, $request->subject_id);
-        }
-
-        if ($userId = $request->user_id) {
-            $query->forUser($userId);
         }
 
         if ($search = $request->search) {
@@ -40,15 +49,17 @@ class ActivityLogController extends Controller
             });
         }
 
+        // 3. Performance Optimization: High-efficiency raw index execution instead of whereDate
         if ($from = $request->from) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('created_at', '>=', $from . ' 00:00:00');
         }
 
         if ($to = $request->to) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('created_at', '<=', $to . ' 23:59:59');
         }
 
-        $perPage = min((int) ($request->per_page ?? 25), 100);
+        // 4. Bound Pagination Limit Protection Guardrail
+        $perPage = min((int) ($request->get('per_page', 25)), 100);
         $logs    = $query->paginate($perPage);
 
         return response()->json([

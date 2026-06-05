@@ -11,12 +11,8 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        info($request->all());
         $timeframe = $request['timeframe'];
         $vaultId = $request['selectedVault'];
-
-        info($timeframe);
-        info($vaultId);
 
         $data = $this->dashboardService->index($timeframe, $vaultId);
 

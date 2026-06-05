@@ -52,12 +52,14 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
         Route::get('/custodian/{vaultId}', [UserController::class, 'getVaultCustodians']);
 
         Route::put('/{userId}/toggle-status', [UserController::class, 'toggleUserStatus']);
-        Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
         Route::get('/{id}/download-id', [UserController::class, 'downloadId']);
 
         Route::get('/{id}/archive-check', [UserController::class, 'archiveCheck']);
+        Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
+        
+        Route::post('/migrate/{id}', [UserController::class, 'migrateUser']);
 
-        // Route::post('/{userId}/migrate-verifications', [UserController::class, 'migrateVerifications']);
+
     });
 
     // cashin

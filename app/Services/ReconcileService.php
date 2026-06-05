@@ -235,8 +235,6 @@ class ReconcileService
 
         $total_bags = $reconcile->vault->bags()->count();
 
-        // Log::info($total_bags);
-
         $expected_balance = $reconcile->vault->bags()->sum('current_amount');
 
 

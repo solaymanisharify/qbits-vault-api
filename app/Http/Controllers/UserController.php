@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ForgetPasswordRequest;
 use App\Http\Requests\PermissionRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -44,7 +43,6 @@ class UserController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        info($request->role);
         $request->validate([
             'role' => 'required|exists:roles,name',
         ]);
@@ -98,45 +96,6 @@ class UserController extends Controller
         ]);
 
         return $this->vaultAssignService->toggleVaultAssign($request, $userId);
-
-        // $vaultId = $request->vault_id;
-
-        // $existing = VaultAssign::where('user_id', $userId)
-        //     ->where('vault_id', $vaultId)
-        //     ->first();
-
-        // if ($existing) {
-        //     // Toggle status
-        //     $newStatus = $existing->status === 'active' ? 'inactive' : 'active';
-
-        //     $existing->update([
-        //         'status' => $newStatus
-        //     ]);
-
-        //     return response()->json([
-        //         'message' => $newStatus === 'active'
-        //             ? 'Vault assigned successfully'
-        //             : 'Vault deactivated successfully',
-        //         'action'  => $newStatus,
-        //         'status'  => $newStatus
-        //     ]);
-        // } else {
-        //     // Create new assignment with active status
-        //     VaultAssign::create([
-        //         'user_id'  => $userId,
-        //         'vault_id' => $vaultId,
-        //         'roles'    => [],
-        //         'status'   => 'active'        // Default active
-        //     ]);
-
-        //     return response()->json([
-        //         'message' => 'Vault assigned successfully',
-        //         'action'  => 'assigned',
-        //         'status'  => 'active'
-        //     ]);
-        // }
-
-
     }
 
     public function updateVaultRoles(Request $request, $userId, $vaultId)
@@ -222,8 +181,12 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $checkData = $this->userService->checkArchiveEligibility($id);
-        return response()->json($checkData, 200);
+        return $this->userService->checkArchiveEligibility($id);
+    }
+    public function migrateUser(Request $request, $id)
+    {
+
+        return $this->userService->migrateUser($request->all(), $id);
     }
 
     public function forgetPassword(Request $request)

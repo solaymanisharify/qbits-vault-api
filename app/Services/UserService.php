@@ -9,6 +9,7 @@ use App\Models\VaultAssign;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Pippa\NotificationSdkLaravel\DTOs\Recipient;
@@ -73,15 +74,34 @@ class UserService
     public function archiveUser($userId)
     {
         $user = $this->findById($userId);
+        if (!$user) {
+            return errorResponse("User not found", [], 404);
+        }
+
+        $existPendingTasks = $this->checkArchiveEligibility($userId);
+
+        $responseData = json_decode($existPendingTasks->getContent(), true);
+
+        $canArchive = $responseData['data']['can_archive'] ?? false;
+
+        if (!$canArchive) {
+            return errorResponse(
+                "User has pending tasks and cannot be archived.",
+                [],
+                422
+            );
+        }
+
         $user->status = 'archived';
         $user->save();
 
         return successResponse("User archived successfully", $user, 200);
     }
 
+
     public function forgetPassword($request)
     {
-       
+
         $request->validate([
             'email' => 'required|string|email',
         ]);
@@ -237,34 +257,144 @@ class UserService
 
     public function checkArchiveEligibility($userId)
     {
-        $matrices = $this->getTrackingMatrices();
         $pendingTasks = [];
 
-        foreach ($matrices as $matrix) {
-            $records = DB::table($matrix['table'])
-                ->where('user_id', $userId)
-                ->where($matrix['column'], false) // Uncompleted transaction locks
-                ->get();
+        // =========================================================================
+        // 1. Check Pending Cash In Verifications
+        // =========================================================================
+        $pendingInVerifications = \App\Models\CashInRequiredVerifier::with(['cashIn.vault'])
+            ->where('user_id', $userId)
+            ->where('verified', false)
+            ->get();
 
-            foreach ($records as $item) {
-                $pendingTasks[] = [
-                    'table' => $matrix['table'],
-                    'id'    => $item->id,
-                    'type'  => $matrix['label']
-                ];
-            }
+        foreach ($pendingInVerifications as $pivot) {
+            $pendingTasks[] = [
+                'id'         => $pivot->cashIn?->tran_id ?? "TXN-IN-{$pivot->cash_in_id}",
+                'cash_in_id' => $pivot->cash_in_id,
+                'vault_name' => $pivot->cashIn?->vault?->name ?? 'N/A',
+                'type'       => 'Cash In Verification Required',
+                'table'      => 'cash_in_required_verifiers'
+            ];
         }
 
-        // Fetch valid fallback users with identical permissions to accept the workspace shift
-        $fallbackUsers = User::where('id', '!=', $userId)
+        // =========================================================================
+        // 2. Check Pending Cash In Approvals
+        // =========================================================================
+        $pendingInApprovals = \App\Models\CashInRequiredApprover::with(['cashIn.vault'])
+            ->where('user_id', $userId)
+            ->where('approved', false)
+            ->get();
+
+        foreach ($pendingInApprovals as $pivot) {
+            $pendingTasks[] = [
+                'id'         => $pivot->cashIn?->tran_id ?? "TXN-IN-{$pivot->cash_in_id}",
+                'cash_in_id' => $pivot->cash_in_id,
+                'vault_name' => $pivot->cashIn?->vault?->name ?? 'N/A',
+                'type'       => 'Cash In Approval Required',
+                'table'      => 'cash_in_required_approvers'
+            ];
+        }
+
+        // =========================================================================
+        // 3. Check Pending Cash Out Verifications
+        // =========================================================================
+        $pendingOutVerifications = \App\Models\CashoutRequiredVerifier::with(['cashOut.vault'])
+            ->where('user_id', $userId)
+            ->where('verified', false)
+            ->get();
+
+        foreach ($pendingOutVerifications as $pivot) {
+            $pendingTasks[] = [
+                'id'          => $pivot->cashOut?->tran_id ?? "TXN-OUT-{$pivot->cash_out_id}",
+                'cash_out_id' => $pivot->cash_out_id,
+                'vault_name'  => $pivot->cashOut?->vault?->name ?? 'N/A',
+                'type'        => 'Cash Out Verification Required',
+                'table'       => 'cashout_required_verifiers'
+            ];
+        }
+
+        // =========================================================================
+        // 4. Check Pending Cash Out Approvals
+        // =========================================================================
+        $pendingOutApprovals = \App\Models\CashoutRequiredApprover::with(['cashOut.vault'])
+            ->where('user_id', $userId)
+            ->where('approved', false)
+            ->get();
+
+        foreach ($pendingOutApprovals as $pivot) {
+            $pendingTasks[] = [
+                'id'          => $pivot->cashOut?->tran_id ?? "TXN-OUT-{$pivot->cash_out_id}",
+                'cash_out_id' => $pivot->cash_out_id,
+                'vault_name'  => $pivot->cashOut?->vault?->name ?? 'N/A',
+                'type'        => 'Cash Out Approval Required',
+                'table'       => 'cashout_required_approvers'
+            ];
+        }
+
+        // =========================================================================
+        // 5. Fetch Valid Fallback Successors
+        // =========================================================================
+        $fallbackUsers = \App\Models\User::where('id', '!=', $userId)
             ->where('status', 'active')
             ->select('id', 'name', 'email')
             ->get();
 
-        return [
-            'can_archive'   => empty($pendingTasks),
-            'pending_tasks' => $pendingTasks,
+        $data = [
+            'can_archive'    => empty($pendingTasks),
+            'pending_tasks'  => $pendingTasks,
             'fallback_users' => $fallbackUsers
         ];
+
+        return successResponse("Successfully fetched archive eligibility", $data, 200);
+    }
+
+    public function migrateUser($request, $userId)
+    {
+        $targetUserId = $request['targetUserId'] ?? null;
+
+        if (empty($userId)) {
+            return errorResponse("Target successor user ID is required.", null, 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // 1. Re-fetch eligibility
+            $response = $this->checkArchiveEligibility($userId);
+
+            // FIX: Extract raw data from the JsonResponse object safely
+            $responseData = $response->getData(true);
+            $pendingTasks = $responseData['data']['pending_tasks'] ?? [];
+
+            foreach ($pendingTasks as $task) {
+                $tableName = $task['table'];
+
+                // Determine the correct foreign key column context based on the task payload type
+                $foreignKeyColumn = isset($task['cash_in_id']) ? 'cash_in_id' : 'cash_out_id';
+                $foreignKeyValue  = $task['cash_in_id'] ?? $task['cash_out_id'];
+
+                // Safely reassign the task row to the new target user
+                DB::table($tableName)
+                    ->where('user_id', $userId)
+                    ->where($foreignKeyColumn, $foreignKeyValue)
+                    ->update([
+                        'user_id'    => $targetUserId,
+                        'updated_at' => now()
+                    ]);
+            }
+
+
+            DB::commit();
+
+            return successResponse("Workflow responsibilities migrated successfully and profile archived.", null, 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("User Workflow Migration Failure: " . $e->getMessage(), [
+                'user_id' => $userId,
+                'target_user_id' => $userId
+            ]);
+
+            return errorResponse("Migration failed: " . $e->getMessage(), null, 500);
+        }
     }
 }
