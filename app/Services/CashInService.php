@@ -307,7 +307,7 @@ class CashInService
 
         // Must have permission
         if (!$user->can('cash-in.approve')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return errorResponse('You do not have permission to approve', [], 403);
         }
 
         // $request->validate([
@@ -396,18 +396,16 @@ class CashInService
 
                     $vault->last_cash_in = now();
                     $vault->save();
-
-
                 }
             }
         }
 
-
-        return response()->json([
-            'message' => ' recorded successfully',
+        $result = [
             'verifier_status' => $cashIn->verifier_status,
             'status' => $cashIn->status,
-        ]);
+        ];
+
+        return successResponse('CashIn approved successfully', $result, 200);
     }
     public function verify($request, $cashInId)
     {
@@ -419,7 +417,7 @@ class CashInService
 
         // Must have permission
         if (!$user->can('cash-in.verify')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return errorResponse('You do not have permission to verify', [], 403);
         }
 
         $action = $request["action"];
@@ -462,9 +460,10 @@ class CashInService
             $cashIn->save();
         }
 
-        return response()->json([
+        $result = [
             'verifier_status' => $cashIn->verifier_status,
             'status' => $cashIn->status,
-        ]);
+        ];
+        return successResponse('CashIn verified successfully', $result, 200);
     }
 }
