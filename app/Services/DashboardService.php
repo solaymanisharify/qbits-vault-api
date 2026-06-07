@@ -2,24 +2,123 @@
 
 namespace App\Services;
 
+use App\Models\CashIn;
+use App\Models\CashOut;
 use App\Models\Vault;
 use App\Models\VaultBag;
 use App\Models\VaultAssign;
-use App\Models\Reconciliation; // Assuming this model maps your reconciliations table
+use App\Models\Reconciliation;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
+    // public function index(string $timeframe = '1month', ?int $vaultId = null)
+    // {
+    //     $user = auth()->user();
+    //     $isSuperAdmin = $user->hasRole('super-admin') || $user->hasRole('super_admin');
+
+    //     // 1. Get the list of accessible vaults for context partitioning
+    //     if ($isSuperAdmin) {
+    //         $accessibleVaults = Vault::select('id', 'name')->get();
+    //         $assignedVaultIds = [];
+    //     } else {
+    //         $assignedVaultIds = VaultAssign::where('user_id', $user->id)
+    //             ->where('status', 'active')
+    //             ->pluck('vault_id')
+    //             ->toArray();
+
+    //         if (empty($assignedVaultIds)) {
+    //             return $this->emptyDashboardResponse();
+    //         }
+
+    //         $accessibleVaults = Vault::whereIn('id', $assignedVaultIds)->select('id', 'name')->get();
+    //     }
+
+    //     // 2. Determine targeted vault IDs for filtering metrics
+    //     $targetVaultIds = $assignedVaultIds;
+
+    //     if ($vaultId) {
+    //         if (!$isSuperAdmin && !in_array($vaultId, $assignedVaultIds)) {
+    //             return $this->emptyDashboardResponse();
+    //         }
+    //         $targetVaultIds = [$vaultId];
+    //     }
+
+    //     // 3. Calculate Date Boundaries
+    //     [$currentStart, $prevStart, $prevEnd, $timeframeType] = $this->getTimeframeRanges($timeframe);
+
+    //     // 4. Base Queries with Vault Filters
+    //     $vaultQuery = Vault::query();
+    //     $bagQuery = VaultBag::query();
+
+    //     if (!$isSuperAdmin || $vaultId) {
+    //         $vaultQuery->whereIn('id', $targetVaultIds);
+    //         $bagQuery->whereIn('vault_id', $targetVaultIds);
+    //     }
+
+    //     $totalVaults = $vaultQuery->count();
+    //     $totalBags = $bagQuery->count();
+
+    //     // 5. Aggregate Financial Totals
+    //     $currentFinancials = (clone $bagQuery)->selectRaw('
+    //         SUM(current_amount) as total_balance,
+    //         SUM(CASE WHEN last_cash_in_amount IS NOT NULL AND updated_at >= ? THEN last_cash_in_amount ELSE 0 END) as total_cash_in,
+    //         SUM(CASE WHEN last_cash_out_amount IS NOT NULL AND updated_at >= ? THEN last_cash_out_amount ELSE 0 END) as total_cash_out
+    //     ', [$currentStart, $currentStart])->first();
+
+    //     $prevFinancials = (clone $bagQuery)->selectRaw('
+    //         SUM(CASE WHEN created_at >= ? AND created_at <= ? THEN current_amount ELSE 0 END) as total_balance,
+    //         SUM(CASE WHEN last_cash_in_amount IS NOT NULL AND updated_at >= ? AND updated_at <= ? THEN last_cash_in_amount ELSE 0 END) as total_cash_in,
+    //         SUM(CASE WHEN last_cash_out_amount IS NOT NULL AND updated_at >= ? AND updated_at <= ? THEN last_cash_out_amount ELSE 0 END) as total_cash_out
+    //     ', [$prevStart, $prevEnd, $prevStart, $prevEnd, $prevStart, $prevEnd])->first();
+
+    //     $balanceChange = $this->calculatePercentageChange($currentFinancials->total_balance, $prevFinancials->total_balance);
+    //     $cashInChange = $this->calculatePercentageChange($currentFinancials->total_cash_in, $prevFinancials->total_cash_in);
+    //     $cashOutChange = $this->calculatePercentageChange($currentFinancials->total_cash_out, $prevFinancials->total_cash_out);
+
+    //     // 6. Generate True Time-Segmented Chart Data
+    //     $chartData = $this->generateTrueChartData($bagQuery, $currentStart, $timeframeType);
+
+    //     // 7. Get Next Most Reconciliation Schedule Entry
+    //     $nextReconciliation = $this->getNextReconciliationDate($isSuperAdmin, $targetVaultIds);
+
+    //     // 8. Fetch Real Dynamic Pending Verification Ledgers
+    //     $pendingLedger = $this->getPendingVerificationLedger($user, $isSuperAdmin, $targetVaultIds);
+
+    //     return [
+    //         'vaults'            => $accessibleVaults,
+    //         'totalVaults'       => $totalVaults,
+    //         'totalBags'         => $totalBags,
+    //         'totalVaultBalance' => [
+    //             'value' => (float) ($currentFinancials->total_balance ?? 0),
+    //             'change' => ($balanceChange >= 0 ? '+' : '') . number_format($balanceChange, 1) . '%',
+    //             'trend' => $balanceChange >= 0 ? 'up' : 'down'
+    //         ],
+    //         'totalCashIn'       => [
+    //             'value' => (float) ($currentFinancials->total_cash_in ?? 0),
+    //             'change' => ($cashInChange >= 0 ? '+' : '') . number_format($cashInChange, 1) . '%',
+    //             'trend' => $cashInChange >= 0 ? 'up' : 'down'
+    //         ],
+    //         'totalCashOut'      => [
+    //             'value' => (float) ($currentFinancials->total_cash_out ?? 0),
+    //             'change' => ($cashOutChange >= 0 ? '+' : '') . number_format($cashOutChange, 1) . '%',
+    //             'trend' => $cashOutChange >= 0 ? 'up' : 'down'
+    //         ],
+    //         'chartData'          => $chartData,
+    //         'nextReconciliation' => $nextReconciliation,
+    //         'pendingLedger'      => $pendingLedger
+    //     ];
+    // }
+
     public function index(string $timeframe = '1month', ?int $vaultId = null)
     {
-        $user = auth()->user();
+        $user         = auth()->user();
         $isSuperAdmin = $user->hasRole('super-admin') || $user->hasRole('super_admin');
 
         // 1. Get the list of accessible vaults for context partitioning
         if ($isSuperAdmin) {
-            $accessibleVaults = Vault::select('id', 'name')->get();
-            $assignedVaultIds = [];
+            $accessibleVaults  = Vault::select('id', 'name')->get();
+            $assignedVaultIds  = [];
         } else {
             $assignedVaultIds = VaultAssign::where('user_id', $user->id)
                 ->where('status', 'active')
@@ -30,7 +129,9 @@ class DashboardService
                 return $this->emptyDashboardResponse();
             }
 
-            $accessibleVaults = Vault::whereIn('id', $assignedVaultIds)->select('id', 'name')->get();
+            $accessibleVaults = Vault::whereIn('id', $assignedVaultIds)
+                ->select('id', 'name')
+                ->get();
         }
 
         // 2. Determine targeted vault IDs for filtering metrics
@@ -47,41 +148,71 @@ class DashboardService
         [$currentStart, $prevStart, $prevEnd, $timeframeType] = $this->getTimeframeRanges($timeframe);
 
         // 4. Base Queries with Vault Filters
-        $vaultQuery = Vault::query();
         $bagQuery = VaultBag::query();
 
         if (!$isSuperAdmin || $vaultId) {
-            $vaultQuery->whereIn('id', $targetVaultIds);
             $bagQuery->whereIn('vault_id', $targetVaultIds);
         }
 
+        // CashIn and CashOut base queries
+        $cashInQuery  = CashIn::query()->where('approver_status', 'approved');
+        $cashOutQuery = CashOut::query()->where('approver_status', 'approved');
+
+        if (!$isSuperAdmin || $vaultId) {
+            $cashInQuery->whereIn('vault_id', $targetVaultIds);
+            $cashOutQuery->whereIn('vault_id', $targetVaultIds);
+        }
+
+        // 5. Vault and Bag counts
+        $vaultQuery = Vault::query();
+
+        if (!$isSuperAdmin || $vaultId) {
+            $vaultQuery->whereIn('id', $targetVaultIds);
+        }
+
         $totalVaults = $vaultQuery->count();
-        $totalBags = $bagQuery->count();
+        $totalBags   = (clone $bagQuery)->count();
 
-        // 5. Aggregate Financial Totals
-        $currentFinancials = (clone $bagQuery)->selectRaw('
-            SUM(current_amount) as total_balance,
-            SUM(CASE WHEN last_cash_in_amount IS NOT NULL AND updated_at >= ? THEN last_cash_in_amount ELSE 0 END) as total_cash_in,
-            SUM(CASE WHEN last_cash_out_amount IS NOT NULL AND updated_at >= ? THEN last_cash_out_amount ELSE 0 END) as total_cash_out
-        ', [$currentStart, $currentStart])->first();
+        // 6. Aggregate Financial Totals
 
-        $prevFinancials = (clone $bagQuery)->selectRaw('
-            SUM(CASE WHEN created_at >= ? AND created_at <= ? THEN current_amount ELSE 0 END) as total_balance,
-            SUM(CASE WHEN last_cash_in_amount IS NOT NULL AND updated_at >= ? AND updated_at <= ? THEN last_cash_in_amount ELSE 0 END) as total_cash_in,
-            SUM(CASE WHEN last_cash_out_amount IS NOT NULL AND updated_at >= ? AND updated_at <= ? THEN last_cash_out_amount ELSE 0 END) as total_cash_out
-        ', [$prevStart, $prevEnd, $prevStart, $prevEnd, $prevStart, $prevEnd])->first();
+        // Current period — Cash In & Cash Out
+        $currentCashIn  = (clone $cashInQuery)
+            ->where('completed_at', '>=', $currentStart)
+            ->sum('cash_in_amount');
 
-        $balanceChange = $this->calculatePercentageChange($currentFinancials->total_balance, $prevFinancials->total_balance);
-        $cashInChange = $this->calculatePercentageChange($currentFinancials->total_cash_in, $prevFinancials->total_cash_in);
-        $cashOutChange = $this->calculatePercentageChange($currentFinancials->total_cash_out, $prevFinancials->total_cash_out);
+        $currentCashOut = (clone $cashOutQuery)
+            ->where('completed_at', '>=', $currentStart)
+            ->sum('cash_out_amount');
 
-        // 6. Generate True Time-Segmented Chart Data
+        // Previous period — Cash In & Cash Out
+        $prevCashIn  = (clone $cashInQuery)
+            ->whereBetween('completed_at', [$prevStart, $prevEnd])
+            ->sum('cash_in_amount');
+
+        $prevCashOut = (clone $cashOutQuery)
+            ->whereBetween('completed_at', [$prevStart, $prevEnd])
+            ->sum('cash_out_amount');
+
+        // Current live balance from vault bags
+        $currentBalance = (clone $bagQuery)->sum('current_amount');
+
+        // Previous period balance estimate (bags created in that window)
+        $prevBalance = (clone $bagQuery)
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
+            ->sum('current_amount');
+
+        // 7. Calculate Percentage Changes
+        $balanceChange = $this->calculatePercentageChange($currentBalance, $prevBalance);
+        $cashInChange  = $this->calculatePercentageChange($currentCashIn, $prevCashIn);
+        $cashOutChange = $this->calculatePercentageChange($currentCashOut, $prevCashOut);
+
+        // 8. Generate True Time-Segmented Chart Data
         $chartData = $this->generateTrueChartData($bagQuery, $currentStart, $timeframeType);
 
-        // 7. Get Next Most Reconciliation Schedule Entry
+        // 9. Get Next Most Reconciliation Schedule Entry
         $nextReconciliation = $this->getNextReconciliationDate($isSuperAdmin, $targetVaultIds);
 
-        // 8. Fetch Real Dynamic Pending Verification Ledgers
+        // 10. Fetch Real Dynamic Pending Verification Ledgers
         $pendingLedger = $this->getPendingVerificationLedger($user, $isSuperAdmin, $targetVaultIds);
 
         return [
@@ -89,23 +220,23 @@ class DashboardService
             'totalVaults'       => $totalVaults,
             'totalBags'         => $totalBags,
             'totalVaultBalance' => [
-                'value' => (float) ($currentFinancials->total_balance ?? 0),
+                'value'  => (float) $currentBalance,
                 'change' => ($balanceChange >= 0 ? '+' : '') . number_format($balanceChange, 1) . '%',
-                'trend' => $balanceChange >= 0 ? 'up' : 'down'
+                'trend'  => $balanceChange >= 0 ? 'up' : 'down',
             ],
             'totalCashIn'       => [
-                'value' => (float) ($currentFinancials->total_cash_in ?? 0),
+                'value'  => (float) $currentCashIn,
                 'change' => ($cashInChange >= 0 ? '+' : '') . number_format($cashInChange, 1) . '%',
-                'trend' => $cashInChange >= 0 ? 'up' : 'down'
+                'trend'  => $cashInChange >= 0 ? 'up' : 'down',
             ],
             'totalCashOut'      => [
-                'value' => (float) ($currentFinancials->total_cash_out ?? 0),
+                'value'  => (float) $currentCashOut,
                 'change' => ($cashOutChange >= 0 ? '+' : '') . number_format($cashOutChange, 1) . '%',
-                'trend' => $cashOutChange >= 0 ? 'up' : 'down'
+                'trend'  => $cashOutChange >= 0 ? 'up' : 'down',
             ],
             'chartData'          => $chartData,
             'nextReconciliation' => $nextReconciliation,
-            'pendingLedger'      => $pendingLedger
+            'pendingLedger'      => $pendingLedger,
         ];
     }
 

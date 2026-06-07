@@ -3,18 +3,97 @@
 namespace App\Repositories;
 
 use App\Models\Vault;
+use App\Models\VaultAssign;
 use App\Models\VaultBag;
 use App\Services\ActivityLoggerService;
 
 class VaultRepository
 {
 
+    // public function index(array $filters = [], int $perPage = 15)
+    // {
+    //     $sortBy  = in_array($filters['sort_by'] ?? '', ['name', 'balance', 'created_at', 'total_bags'])
+    //         ? $filters['sort_by']
+    //         : 'created_at';
+    //     $sortDir = ($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+
+    //     $query = Vault::query()
+    //         ->select([
+    //             'id',
+    //             'vault_code',
+    //             'name',
+    //             'address',
+    //             'balance',
+    //             'bag_min_bal_limit',
+    //             'bag_balance_limit',
+    //             'total_racks',
+    //             'total_bags',
+    //             'last_cash_in',
+    //             'last_cash_out',
+    //             'status',
+    //             'created_at',
+    //         ])
+    //         ->withCount('bags')
+    //         ->with(['bags:id,vault_id,barcode,bag_identifier_barcode,rack_number,current_amount,is_active,is_sealed'])
+    //         ->when($filters['search'] ?? null, function ($q, $search) {
+    //             // Wrap in a grouped where so OR doesn't bleed into other clauses
+    //             $q->where(function ($q2) use ($search) {
+    //                 $q2->where('name',     'like', "%{$search}%")
+    //                     ->orWhere('vault_code', 'like', "%{$search}%")
+    //                     ->orWhere('address', 'like', "%{$search}%");
+    //             });
+    //         })
+    //         ->when($filters['user_id'] ?? null, fn($q, $id) => $q->where('user_id', $id))
+    //         ->when($filters['status']  ?? null, function ($q, $status) {
+    //             $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
+    //             $q->whereJsonPath('status.open', '=', $isOpen);
+    //         })
+    //         ->orderBy($sortBy, $sortDir);
+
+    //     $user = auth()->user();
+
+    //     // Check your role naming here. 
+    //     // If your superadmin role is called 'super_admin', change this string to 'super_admin'
+    //     if (!$user->hasRole('super-admin')) {
+
+    //         // Force the cash_ins query to match an active row in the vault_assigns table
+    //         $query->whereHas('vault.assignments', function ($q) use ($user) {
+    //             $q->where('user_id', $user->id)
+    //                 ->where('status', 'active');
+    //         });
+    //     }
+
+    //     $results = $perPage ? $query->paginate($perPage) : $query->get();
+    //     return successResponse(
+    //         "Successfully retrieved vaults",
+    //         $results,
+    //         200
+    //     );
+    // }
+
     public function index(array $filters = [], int $perPage = 15)
     {
+        $user         = auth()->user();
+        $isSuperAdmin = $user->hasRole('super-admin') || $user->hasRole('super_admin');
+
         $sortBy  = in_array($filters['sort_by'] ?? '', ['name', 'balance', 'created_at', 'total_bags'])
             ? $filters['sort_by']
             : 'created_at';
         $sortDir = ($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+
+        $assignedVaultIds = [];
+        if (!$isSuperAdmin) {
+            $assignedVaultIds = VaultAssign::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->pluck('vault_id')
+                ->toArray();
+
+            if (empty($assignedVaultIds)) {
+                return successResponse('Successfully retrieved vaults', collect([]), 200);
+            }
+        }
 
         $query = Vault::query()
             ->select([
@@ -32,14 +111,15 @@ class VaultRepository
                 'status',
                 'created_at',
             ])
-            ->withCount('bags')
+            // Single query for bags — derive count from the loaded collection
+            // avoids hitting the bags table twice (withCount + with)
             ->with(['bags:id,vault_id,barcode,bag_identifier_barcode,rack_number,current_amount,is_active,is_sealed'])
+            ->when(!$isSuperAdmin, fn($q) => $q->whereIn('id', $assignedVaultIds))
             ->when($filters['search'] ?? null, function ($q, $search) {
-                // Wrap in a grouped where so OR doesn't bleed into other clauses
                 $q->where(function ($q2) use ($search) {
-                    $q2->where('name',     'like', "%{$search}%")
+                    $q2->where('name',        'like', "%{$search}%")
                         ->orWhere('vault_code', 'like', "%{$search}%")
-                        ->orWhere('address', 'like', "%{$search}%");
+                        ->orWhere('address',    'like', "%{$search}%");
                 });
             })
             ->when($filters['user_id'] ?? null, fn($q, $id) => $q->where('user_id', $id))
@@ -50,13 +130,15 @@ class VaultRepository
             ->orderBy($sortBy, $sortDir);
 
         $results = $perPage ? $query->paginate($perPage) : $query->get();
-        return successResponse(
-            "Successfully retrieved vaults",
-            $results,
-            200
-        );
-    }
 
+        // Append bags_count derived from already-loaded relation (no extra query)
+        $results->getCollection()->transform(function ($vault) {
+            $vault->bags_count = $vault->bags->count();
+            return $vault;
+        });
+
+        return successResponse('Successfully retrieved vaults', $results, 200);
+    }
     /**
      * Store a new vault in database.  
      */

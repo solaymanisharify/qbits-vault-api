@@ -21,4 +21,11 @@ class VaultAssignRepository
     {
         return VaultAssign::where('user_id', $userId)->where('vault_id', $vaultId)->get();
     }
+    public function getAssignActiveVaultByUserId($userId)
+    {
+        return VaultAssign::where('user_id', $userId)
+            ->where('status', 'active')
+            ->pluck('vault_id')
+            ->toArray();
+    }
 }

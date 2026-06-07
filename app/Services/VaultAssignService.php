@@ -22,6 +22,10 @@ class VaultAssignService
     {
         return $this->vaultAssignRepository->getAssignVaultByUserIdAndVaultId($userId, $vaultId);
     }
+    public function getAssignActiveVaultByUserId(int $userId)
+    {
+        return $this->vaultAssignRepository->getAssignActiveVaultByUserId($userId);
+    }
 
     public function toggleVaultAssign($request, $userId)
     {
