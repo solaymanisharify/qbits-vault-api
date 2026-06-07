@@ -186,7 +186,8 @@ class CashOutService
 
         // Must have permission
         if (!$user->can('cash-out.approve')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+
+            return errorResponse('You do not have permission to approve', [], 403);
         }
 
 
@@ -255,11 +256,11 @@ class CashOutService
         }
 
 
-        return response()->json([
-            'message' => ' recorded successfully',
+        $result = [
             'verifier_status' => $cashOut->verifier_status,
             'status' => $cashOut->status,
-        ]);
+        ];
+        return successResponse('CashOut approved successfully', $result, 200);
     }
     public function verify($cashOutId)
     {
@@ -275,7 +276,8 @@ class CashOutService
 
         // Must have permission
         if (!$user->can('cash-out.verify')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+
+            return errorResponse('You do not have permission to verify', [], 403);
         }
 
         // Check if this user is a required verifier for this CashIn
@@ -308,11 +310,11 @@ class CashOutService
             $cashOut->save();
         }
 
-        return response()->json([
-            'message' => 'Verified successfully',
+        $result = [
             'verifier_status' => $cashOut->verifier_status,
             'status' => $cashOut->status,
-        ]);
+        ];
+        return successResponse('CashOut verified successfully', $result, 200);
     }
 
     public function deleteCashOut($cashOutId)

@@ -130,7 +130,7 @@ class CashInService
         if ($bag) {
             $existPendingInCashIn = CashIn::where('bag_id', $bag->id)
                 ->whereNull('completed_at')
-                ->exists(); // Using exists() is faster than first() if you just need a boolean
+                ->exists();
 
             // 3. If both conditions are met, return the error
             if ($existPendingInCashIn) {

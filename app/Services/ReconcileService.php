@@ -2,17 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\User;
-use App\Models\Vault;
-use App\Models\VaultAssign;
 use App\Repositories\ReconcileRepository;
 use App\Repositories\ReconcileRequiredRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
-use function Symfony\Component\String\s;
 
 class ReconcileService
 {
@@ -241,26 +234,7 @@ class ReconcileService
 
         return successResponse("Successfully started reconcile", $reconcile, 200);
     }
-    // public function saveReconcile($reconcileId)
-    // {
-    //     $reconcile = $this->findById($reconcileId);
 
-    //     // $vault =  $reconcile->vault();
-
-    //     if ($reconcile->status !== 'pending' || $reconcile->is_locked) {
-    //         return response()->json(['error' => 'Cannot start reconciliation'], 400);
-    //     }
-
-    //     $reconcile->is_locked = true;
-    //     $reconcile->status = 'counting';
-    //     $reconcile->started_by = auth()->user()->id;
-    //     $reconcile->locked_until = now()->addHours(6);
-    //     $reconcile->save();
-
-    //     return successResponse("Successfully started reconcile", $reconcile, 200);
-
-    //     // return response()->json(['success' => true]);
-    // }
 
     public function latestReconcile()
     {
