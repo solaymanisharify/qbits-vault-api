@@ -79,3 +79,4 @@ jobs:
             **/tests/**
             **/vendor/**/tests/**
             **/vendor/**/docs/**
+            **/bootstrap/cache/*.php
