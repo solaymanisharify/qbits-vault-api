@@ -22,12 +22,12 @@ class UserRepository
 
         // Non-admin, non-superadmin → return only their own data
         if (!$isSuperAdmin && !$isAdmin) {
-            return User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')
+            return User::with('roles', 'permissions', 'vaultAssignments.vault:id,name', 'defaultVault:id,name')
                 ->where('id', $authUser->id)
                 ->paginate(1);
         }
 
-        $query = User::with('roles', 'permissions', 'vaultAssignments', 'defaultVault:id,name')
+        $query = User::with('roles', 'permissions', 'vaultAssignments.vault:id,name', 'defaultVault:id,name')
             ->where('status', '!=', 'archived')
             ->orderBy('created_at', 'desc');
 
