@@ -12,4 +12,8 @@ class CustodianCashHistory extends Model
     {
         return $this->belongsTo(User::class, 'custodian_id', 'id');
     }
+    public function vault()
+    {
+        return $this->belongsTo(Vault::class);
+    }
 }

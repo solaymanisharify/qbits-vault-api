@@ -331,11 +331,31 @@ class UserService
             ];
         }
 
+
+        // =========================================================================
+        // 4. Check Pending Custodain Approvals
+        // =========================================================================
+        $pendingCustodianApprovals = \App\Models\CustodianCashHistory::with(['vault'])
+            ->where('custodian_id', $userId)
+            ->where('status', 'pending')
+            ->get();
+
+        foreach ($pendingCustodianApprovals as $pivot) {
+            $pendingTasks[] = [
+                'id'          => $pivot->vault?->name,
+                'cash_out_id' => $pivot->cash_out_id,
+                'vault_name'  => $pivot->vault?->name ?? 'N/A',
+                'type'        => 'Custodian Approval Required',
+                'table'       => 'custodian_cash_histories'
+            ];
+        }
+
         // =========================================================================
         // 5. Fetch Valid Fallback Successors
         // =========================================================================
-        $fallbackUsers = \App\Models\User::where('id', '!=', $userId)
+        $fallbackUsers = User::where('id', '!=', $userId)
             ->where('status', 'active')
+            ->where('verified', true)
             ->select('id', 'name', 'email')
             ->get();
 
@@ -348,11 +368,65 @@ class UserService
         return successResponse("Successfully fetched archive eligibility", $data, 200);
     }
 
+    // public function migrateUser($request, $userId)
+    // {
+    //     $targetUserId = $request['targetUserId'] ?? null;
+
+    //     if (empty($userId)) {
+    //         return errorResponse("Target successor user ID is required.", null, 422);
+    //     }
+
+    //     DB::beginTransaction();
+
+    //     try {
+    //         // 1. Re-fetch eligibility
+    //         $response = $this->checkArchiveEligibility($userId);
+
+    //         // FIX: Extract raw data from the JsonResponse object safely
+    //         $responseData = $response->getData(true);
+    //         $pendingTasks = $responseData['data']['pending_tasks'] ?? [];
+
+    //         foreach ($pendingTasks as $task) {
+    //             $tableName = $task['table'];
+
+    //             // Determine the correct foreign key column context based on the task payload type
+    //             $foreignKeyColumn = isset($task['cash_in_id']) ? 'cash_in_id' : 'cash_out_id';
+    //             $foreignKeyValue  = $task['cash_in_id'] ?? $task['cash_out_id'];
+
+    //             // Safely reassign the task row to the new target user
+    //             DB::table($tableName)
+    //                 ->where('user_id', $userId)
+    //                 ->where($foreignKeyColumn, $foreignKeyValue)
+    //                 ->update([
+    //                     'user_id'    => $targetUserId,
+    //                     'updated_at' => now()
+    //                 ]);
+    //         }
+
+
+    //         DB::commit();
+
+    //         return successResponse("Workflow responsibilities migrated successfully and profile archived.", null, 200);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         \Log::error("User Workflow Migration Failure: " . $e->getMessage(), [
+    //             'user_id' => $userId,
+    //             'target_user_id' => $userId
+    //         ]);
+
+    //         return errorResponse("Migration failed: " . $e->getMessage(), null, 500);
+    //     }
+    // }
+
     public function migrateUser($request, $userId)
     {
         $targetUserId = $request['targetUserId'] ?? null;
 
         if (empty($userId)) {
+            return errorResponse("Target successor user ID is required.", null, 422);
+        }
+
+        if (empty($targetUserId)) {
             return errorResponse("Target successor user ID is required.", null, 422);
         }
 
@@ -362,36 +436,81 @@ class UserService
             // 1. Re-fetch eligibility
             $response = $this->checkArchiveEligibility($userId);
 
-            // FIX: Extract raw data from the JsonResponse object safely
             $responseData = $response->getData(true);
             $pendingTasks = $responseData['data']['pending_tasks'] ?? [];
 
+            // 2. Migrate pending workflow tasks to target user
             foreach ($pendingTasks as $task) {
                 $tableName = $task['table'];
 
-                // Determine the correct foreign key column context based on the task payload type
                 $foreignKeyColumn = isset($task['cash_in_id']) ? 'cash_in_id' : 'cash_out_id';
                 $foreignKeyValue  = $task['cash_in_id'] ?? $task['cash_out_id'];
 
-                // Safely reassign the task row to the new target user
+                if ($tableName == 'custodian_cash_histories') {
+                    $user_id = 'custodian_id';
+                } else {
+                    $user_id = 'user_id';
+                }
+
                 DB::table($tableName)
-                    ->where('user_id', $userId)
+                    ->where($user_id, $userId)
                     ->where($foreignKeyColumn, $foreignKeyValue)
                     ->update([
-                        'user_id'    => $targetUserId,
+                        $user_id => $targetUserId,
                         'updated_at' => now()
                     ]);
             }
 
+            // 3. Migrate vault assignments from userId → targetUserId
+            $sourceVaultAssignments = DB::table('vault_assigns')
+                ->where('user_id', $userId)
+                ->where('status', 'active')
+                ->get();
+
+            foreach ($sourceVaultAssignments as $assignment) {
+                // Check if targetUser already has an assignment for this vault
+                $existingAssignment = DB::table('vault_assigns')
+                    ->where('user_id', $targetUserId)
+                    ->where('vault_id', $assignment->vault_id)
+                    ->first();
+
+                if (!$existingAssignment) {
+                    // Target user has no assignment for this vault — create one
+                    DB::table('vault_assigns')->insert([
+                        'vault_id'   => $assignment->vault_id,
+                        'user_id'    => $targetUserId,
+                        'roles'      => $assignment->roles, // already JSON string from DB
+                        'status'     => 'active',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    // Target user already has this vault — merge any missing roles
+                    $existingRoles = json_decode($existingAssignment->roles, true) ?? [];
+                    $sourceRoles   = json_decode($assignment->roles, true) ?? [];
+
+                    $mergedRoles = array_values(array_unique(array_merge($existingRoles, $sourceRoles)));
+
+                    // Only update if there are new roles to add
+                    if (count($mergedRoles) > count($existingRoles)) {
+                        DB::table('vault_assigns')
+                            ->where('id', $existingAssignment->id)
+                            ->update([
+                                'roles'      => json_encode($mergedRoles),
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }
+            }
 
             DB::commit();
 
-            return successResponse("Workflow responsibilities migrated successfully and profile archived.", null, 200);
+            return successResponse("Workflow responsibilities and vault assignments migrated successfully.", null, 200);
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("User Workflow Migration Failure: " . $e->getMessage(), [
-                'user_id' => $userId,
-                'target_user_id' => $userId
+                'user_id'        => $userId,
+                'target_user_id' => $targetUserId, // ← also fixed the bug here (was logging $userId twice)
             ]);
 
             return errorResponse("Migration failed: " . $e->getMessage(), null, 500);

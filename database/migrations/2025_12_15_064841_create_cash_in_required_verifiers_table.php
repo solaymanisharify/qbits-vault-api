@@ -20,7 +20,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Prevent duplicates
-            $table->unique(['cash_in_id', 'user_id']);
+            // $table->unique(['cash_in_id', 'user_id']);
         });
     }
 

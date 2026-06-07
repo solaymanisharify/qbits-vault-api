@@ -68,10 +68,19 @@ class ReconcileService
         }
 
 
-        return DB::transaction(function () use ($data, $verifierRole, $auditorRole, $auditInitiatorRole) {
+        $vaultId = $data['vault_id'];
+
+        $existingActiveReconcile = $this->reconcileRepository->findActiveByVaultId($vaultId);
+
+        if ($existingActiveReconcile) {
+            return errorResponse("A reconciliation process is already in progress for this vault.", [], 400);
+        }
+
+
+        return DB::transaction(function () use ($data, $verifierRole, $auditorRole, $auditInitiatorRole, $vaultId) {
 
             $data["reconcile_tran_id"] = $this->generateReconcileId();
-            $vaultId = $data['vault_id'];
+
 
             $reconcile = $this->reconcileRepository->createReconcile($data);
 
@@ -109,6 +118,11 @@ class ReconcileService
 
             return successResponse("Successfully created cash-in", [], 200);
         });
+    }
+
+    public function findActiveByVaultId($vaultId)
+    {
+        return $this->reconcileRepository->findActiveByVaultId($vaultId);
     }
 
     private function generateReconcileId()

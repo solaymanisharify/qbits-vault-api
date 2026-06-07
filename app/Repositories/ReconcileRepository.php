@@ -84,6 +84,13 @@ class ReconcileRepository
         return Reconciliation::create($data);
     }
 
+    public function findActiveByVaultId($vaultId)
+    {
+        return Reconciliation::where('vault_id', $vaultId)
+            ->where('status', '!=', 'completed') // Captures pending, ongoing, etc.
+            ->first();
+    }
+
     // Get pending reconciliations for a specific verifier (not yet verified by them)
     public function getPendingForVerifier($userId)
     {
