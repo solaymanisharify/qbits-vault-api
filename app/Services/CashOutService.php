@@ -232,7 +232,7 @@ class CashOutService
                 $bag->current_amount = 0;
                 $bag->denominations = [];
 
-                $bag->last_cash_out_amount = $cashOut->request_amount;
+                $bag->last_cash_out_amount = $cashOut->cash_out_amount;
                 $bag->last_cash_out_at = now();
                 $bag->last_cash_out_by = $cashOut->user_id; // or auth()->id()
                 $bag->last_cash_out_tran_id = $cashOut->tran_id;

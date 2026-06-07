@@ -393,6 +393,7 @@ class CashInService
 
                     // Update vault balance
                     $vault = $bag->vault;
+                    // $vault->balance += $cashIn->cash_in_amount;
 
                     $vault->last_cash_in = now();
                     $vault->save();

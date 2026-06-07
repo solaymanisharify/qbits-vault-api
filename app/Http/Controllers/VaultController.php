@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreVaultRequest;
 use App\Models\Vault;
 use App\Services\VaultBagRequestService;
 use App\Services\VaultBagService;
@@ -19,9 +20,9 @@ class VaultController extends Controller
         return $this->vaultService->getAll($filters);
     }
 
-    public function store(Request $request)
+    public function store(StoreVaultRequest $request)
     {
-        $vault = $this->vaultService->store($request->all());
+        $vault = $this->vaultService->store($request);
         return $vault;
     }
 

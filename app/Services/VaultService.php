@@ -16,7 +16,7 @@ class VaultService
         return $this->repository->index($filters, $perPage);
     }
 
-    public function store(array $data)
+    public function store($data)
     {
         $vault = $this->repository->store($data);
 
