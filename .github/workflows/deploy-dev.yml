@@ -34,7 +34,7 @@ jobs:
         run: composer validate --strict
         
       - name: Install Dependencies
-        run: composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction
+        run: composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
         
       - name: Set Environment Variables
         run: |
