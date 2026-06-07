@@ -117,18 +117,31 @@ class CashInService
             }
         }
 
+        $role = $authUserId->roles->contains(function ($role) {
+            return strtolower($role->name) === 'bag create';
+        });
+
         // calculation which bag is suitable for the cash-in amount
         $bag = VaultBag::where('vault_id', $vaultId)
             ->where('is_active', true)
             ->where('current_amount', 0)
             ->first();
 
+        $existPendingInCashIn = CashIn::where('bag_id', $bag->id)->where('verifier_status', '===', 'pending')->first();
+
+        if ($bag && $existPendingInCashIn) {
+            return errorResponse(
+                [
+                    'message' => 'No bag available for cash-in',
+                    'bag_create_role' => $role,
+                    'vault_id' => $vaultId,
+                ],
+                [],
+                500
+            );
+        }
 
         if (!$bag) {
-
-            $role = $authUserId->roles->contains(function ($role) {
-                return strtolower($role->name) === 'bag create';
-            });
 
             return errorResponse(
                 [
