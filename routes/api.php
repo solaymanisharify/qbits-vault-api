@@ -56,10 +56,8 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
 
         Route::get('/{id}/archive-check', [UserController::class, 'archiveCheck']);
         Route::put('/{userId}/archive', [UserController::class, 'archiveUser']);
-        
+
         Route::post('/migrate/{id}', [UserController::class, 'migrateUser']);
-
-
     });
 
     // cashin
