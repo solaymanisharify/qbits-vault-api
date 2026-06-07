@@ -12,16 +12,16 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'  # Changed from 8.2 to 8.4
-          extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql
+          php-version: '8.4'
+          extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql, sodium
           ini-values: |
             memory_limit=512M
           coverage: none
-          
+
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
@@ -29,18 +29,19 @@ jobs:
           key: ${{ runner.os }}-composer-8.4-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-composer-8.4-
-            
+
       - name: Validate composer.json and composer.lock
         run: composer validate --strict
-        
-      - name: Install Dependencies
-        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
-        
+
+      - name: Install Dependencies (no dev)
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-progress
+
       - name: Set Environment Variables
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "APP_ENV=production" > .env
             echo "APP_DEBUG=false" >> .env
+            echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
             echo "DB_DATABASE=${{ secrets.LIVE_DB_DATABASE }}" >> .env
             echo "DB_USERNAME=${{ secrets.LIVE_DB_USERNAME }}" >> .env
             echo "DB_PASSWORD=${{ secrets.LIVE_DB_PASSWORD }}" >> .env
@@ -48,14 +49,19 @@ jobs:
           else
             echo "APP_ENV=development" > .env
             echo "APP_DEBUG=true" >> .env
+            echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
             echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
             echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             echo "DB_HOST=${{ secrets.DB_HOST || '127.0.0.1' }}" >> .env
           fi
-          echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
         shell: bash
-        
+
+      - name: Delete bootstrap cache files
+        run: |
+          rm -f bootstrap/cache/packages.php
+          rm -f bootstrap/cache/services.php
+
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
