@@ -127,18 +127,23 @@ class CashInService
             ->where('current_amount', 0)
             ->first();
 
-        $existPendingInCashIn = CashIn::where('bag_id', $bag->id)->where('verifier_status', '===', 'pending')->first();
+        if ($bag) {
+            $existPendingInCashIn = CashIn::where('bag_id', $bag->id)
+                ->whereNull('completed_at')
+                ->exists(); // Using exists() is faster than first() if you just need a boolean
 
-        if ($bag && $existPendingInCashIn) {
-            return errorResponse(
-                [
-                    'message' => 'No bag available for cash-in',
-                    'bag_create_role' => $role,
-                    'vault_id' => $vaultId,
-                ],
-                [],
-                500
-            );
+            // 3. If both conditions are met, return the error
+            if ($existPendingInCashIn) {
+                return errorResponse(
+                    [
+                        'message' => 'No bag available for cash-in',
+                        'bag_create_role' => $role,
+                        'vault_id' => $vaultId,
+                    ],
+                    [],
+                    500
+                );
+            }
         }
 
         if (!$bag) {
