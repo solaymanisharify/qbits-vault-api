@@ -16,7 +16,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.3'
           extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql, sodium
           ini-values: |
             memory_limit=512M
@@ -26,9 +26,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-composer-8.4-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-composer-8.3-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-composer-8.4-
+            ${{ runner.os }}-composer-8.3-
 
       - name: Validate composer.json and composer.lock
         run: composer validate --strict
@@ -79,3 +79,4 @@ jobs:
             **/tests/**
             **/vendor/**/tests/**
             **/vendor/**/docs/**
+            **/bootstrap/cache/*.php
