@@ -16,7 +16,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          php-version: '8.3'
           extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql, sodium
           ini-values: |
             memory_limit=512M
@@ -54,19 +54,13 @@ jobs:
             echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             echo "DB_HOST=${{ secrets.DB_HOST || '127.0.0.1' }}" >> .env
-            echo "CACHE_DRIVER=file" >> .env
-            echo "SESSION_DRIVER=file" >> .env
-            echo "QUEUE_CONNECTION=sync" >> .env
           fi
         shell: bash
 
-      - name: Clear local bootstrap caches
+      - name: Delete bootstrap cache files
         run: |
-          php artisan config:clear
-          php artisan cache:clear
-
-      - name: Regenerate package discovery without dev packages
-        run: php artisan package:discover --ansi
+          rm -f bootstrap/cache/packages.php
+          rm -f bootstrap/cache/services.php
 
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
