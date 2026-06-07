@@ -61,9 +61,8 @@ jobs:
         # Force clears local runner bootstrap caches so stale files aren't tracked or transferred
         run: |
           php artisan config:clear
-          php artisan package:clear
-          php artisan route:clear
-          php artisan view:clear
+          php artisan optimize:clear
+      
 
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
