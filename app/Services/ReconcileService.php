@@ -175,15 +175,8 @@ class ReconcileService
 
         // Must have permission
         if (!$user->can('reconciliation.verify')) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+            return errorResponse('You do not have permission to verify', [], 403);
         }
-
-        // $request->validate([
-        //     'action' => 'required|in:verify,approve,reject',
-        //     'note' => 'nullable|string|max:500',
-        // ]);
-
-        // $action = $request["action"];
 
         // Check if this user is a required verifier for this CashIn
         $requiredVerifier = $reconcile->requiredVerifiers()
@@ -198,14 +191,6 @@ class ReconcileService
         if ($requiredVerifier->verified) {
             return errorResponse('You have already verified this Reconcile', 400);
         }
-
-        // Log the verification action
-        // CashInVerification::create([
-        //     'cash_in_id' => $cashIn->id,
-        //     'user_id' => $user->id,
-        //     'action' => $action,
-        //     'note' => $request->note,
-        // ]);
 
         // Mark as verified in required table
         $requiredVerifier->update([
@@ -222,11 +207,12 @@ class ReconcileService
             $reconcile->save();
         }
 
-        return response()->json([
-            'message' => ' Verify recorded successfully',
+        $result = [
             'verifier_status' => $reconcile->verifier_status,
             'status' => $reconcile->status,
-        ]);
+        ];
+
+        return successResponse('CashIn approved successfully', $result, 200);
     }
 
     public function startReconcile($reconcileId)
