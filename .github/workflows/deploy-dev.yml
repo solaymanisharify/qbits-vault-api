@@ -16,7 +16,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'  # Changed from 8.2 to 8.4
+          php-version: '8.4'
           extensions: mbstring, xml, curl, zip, gd, intl, bcmath, pdo_mysql
           ini-values: |
             memory_limit=512M
@@ -34,6 +34,7 @@ jobs:
         run: composer validate --strict
         
       - name: Install Dependencies
+        # Added --ignore-platform-reqs if your cPanel PHP version is slightly lower (e.g., 8.3) than GitHub's 8.4
         run: composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
         
       - name: Set Environment Variables
@@ -55,7 +56,15 @@ jobs:
           fi
           echo "APP_KEY=${{ secrets.APP_KEY }}" >> .env
         shell: bash
-        
+
+      - name: Clear Bootstrap Caches Pre-Deployment
+        # Force clears local runner bootstrap caches so stale files aren't tracked or transferred
+        run: |
+          php artisan config:clear
+          php artisan package:clear
+          php artisan route:clear
+          php artisan view:clear
+
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
@@ -73,3 +82,4 @@ jobs:
             **/tests/**
             **/vendor/**/tests/**
             **/vendor/**/docs/**
+            **/bootstrap/cache/*.php
