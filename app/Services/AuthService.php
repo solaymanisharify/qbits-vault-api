@@ -95,17 +95,17 @@ class AuthService
 
     public function changePassword($request)
     {
-
         $user = auth()->user();
 
-        // Verify current password
-        if (!Hash::check($request->currentPassword, $user->password)) {
+        if (!Hash::check($request['currentPassword'], $user->password)) {
             return errorResponse("Invalid current password", [], 403);
         }
 
         $user = $this->userRepository->findById($user->id);
-        $user->password = Hash::make($request->newPassword);
+
+        $user->password = Hash::make($request['newPassword']);
         $user->save();
+
         return $user;
     }
     public function superAdminChangeUserPassword($newPassword, $userId)
