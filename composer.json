@@ -16,6 +16,12 @@
         "laravel/tinker": "^2.10.1",
         "pippa/notification-sdk-laravel": "^1.0",
         "spatie/laravel-permission": "^6.23",
+        "symfony/clock": "^7.0",
+        "symfony/css-selector": "^7.0",
+        "symfony/event-dispatcher": "^7.0",
+        "symfony/string": "^7.0",
+        "symfony/translation": "^7.0",
+        "symfony/yaml": "^7.0",
         "tymon/jwt-auth": "^2.2"
     },
     "require-dev": {
@@ -92,7 +98,7 @@
             "php-http/discovery": true
         },
         "platform": {
-            "php": "8.4.0"
+            "php": "8.3.31"
         }
     },
     "minimum-stability": "stable",
