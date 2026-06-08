@@ -222,9 +222,16 @@ class UserRepository
         ActivityLoggerService::created(
             $newUser,
             'user',
-            $newUser->name . '(' . $newUser->email . ')',
-            $newUser->toArray(),
-            ['user_id' => $newUser->id]
+            "User {$newUser->name} ({$newUser->email})",
+            [
+                'name'   => $newUser->name,
+                'email'  => $newUser->email,
+                'status' => $newUser->status
+            ], // Filtered new_values (exclude password bcrypt!)
+            [
+                'assigned_roles' => $roleNames,
+                'assigned_by'    => Auth::user()?->email ?? 'System'
+            ]
         );
 
         return successResponse("User created successfully", $newUser, 201);

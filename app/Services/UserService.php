@@ -424,6 +424,7 @@ class UserService
                         ->where('id', $assignment->id)
                         ->update([
                             'user_id'    => $targetUserId,
+                            'status'     => 'active',
                             'updated_at' => now(),
                         ]);
                 } else {
@@ -436,6 +437,7 @@ class UserService
                         ->where('id', $existingAssignment->id)
                         ->update([
                             'roles'      => json_encode($mergedRoles),
+                            'status'     => 'active',
                             'updated_at' => now(),
                         ]);
 
