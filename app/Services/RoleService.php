@@ -27,6 +27,15 @@ class RoleService
     {
         try {
             $role = $this->roleRepository->create($data);
+
+            ActivityLoggerService::created(
+                $role,
+                'role',
+                $role->name,
+                $role->toArray(),
+                ['role_' => $role->id]
+            );
+
             return successResponse("Role created successfully", $role, 200);
         } catch (RoleAlreadyExists $e) {
             return errorResponse(

@@ -22,8 +22,7 @@ class VaultController extends Controller
 
     public function store(StoreVaultRequest $request)
     {
-        $vault = $this->vaultService->store($request->all());
-        return $vault;
+        return $this->vaultService->store($request->all());
     }
 
     public function show($id)

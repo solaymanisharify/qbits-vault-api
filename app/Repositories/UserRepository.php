@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\User;
+use App\Services\ActivityLoggerService;
 use App\Services\RoleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -218,14 +219,16 @@ class UserRepository
 
         $newUser->load('roles');
 
+        ActivityLoggerService::created(
+            $newUser,
+            'user',
+            $newUser->name . '(' . $newUser->email . ')',
+            $newUser->toArray(),
+            ['user_id' => $newUser->id]
+        );
+
         return successResponse("User created successfully", $newUser, 201);
     }
-    // Add this method to your RoleService if it doesn't exist
-    // public function findMultiple(array $roleIds)
-    // {
-    //     return Role::whereIn('id', $roleIds)->get();
-    // }
-
     // public function update($request, $id)
     // {
     //     $user = User::findOrFail($id);

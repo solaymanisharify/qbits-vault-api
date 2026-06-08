@@ -111,6 +111,7 @@ class VaultBag extends Model
     //     $this->save();
     // }
 
+
     public function appendHistory(string $event, string $description, array $data = []): void
     {
         $history   = $this->history ?? [];
