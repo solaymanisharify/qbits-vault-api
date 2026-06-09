@@ -9,7 +9,7 @@ use Spatie\Permission\Exceptions\RoleAlreadyExists;
 class RoleService
 {
 
-    public function __construct(protected RoleRepository $roleRepository) {}
+    public function __construct(protected RoleRepository $roleRepository, protected LogService $logService) {}
 
     public function index($request = null)
     {
@@ -23,17 +23,45 @@ class RoleService
     {
         return $this->roleRepository->getByRoles($roles);
     }
+    // public function create($data)
+    // {
+    //     try {
+    //         $role = $this->roleRepository->create($data);
+
+    //         ActivityLoggerService::created(
+    //             $role,
+    //             'role',
+    //             $role->name,
+    //             $role->toArray(),
+    //             ['role_' => $role->id]
+    //         );
+
+    //         return successResponse("Role created successfully", $role, 200);
+    //     } catch (RoleAlreadyExists $e) {
+    //         return errorResponse(
+    //             "A role `{$data['name']}` already exists.",
+    //             [],
+    //             422
+    //         );
+    //     }
+    // }
     public function create($data)
     {
         try {
             $role = $this->roleRepository->create($data);
 
-            ActivityLoggerService::created(
-                $role,
+            $this->logService->activityLog(
+                'created',
                 'role',
-                $role->name,
-                $role->toArray(),
-                ['role_' => $role->id]
+                "New Role #{$role->name}",
+                [
+                    $role->toArray(),
+                    [
+                        'role_name' => $role->name,
+                        'role_id' => $role->id,
+
+                    ]
+                ]
             );
 
             return successResponse("Role created successfully", $role, 200);

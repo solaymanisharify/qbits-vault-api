@@ -53,7 +53,7 @@ class ReportService
                 'completed_at',
                 'vault_id',
                 DB::raw('NULL as bag_id'),
-                'request_amount as debit',
+                'cash_out_amount as debit',
                 DB::raw('NULL as credit'),
                 'approver_status',
                 DB::raw("'cash_out' as transaction_type")

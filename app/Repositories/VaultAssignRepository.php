@@ -10,6 +10,14 @@ class VaultAssignRepository
     {
         return VaultAssign::create($data);
     }
+    public function update($data, $id)
+    {
+        return VaultAssign::where('id', $id)->update($data);
+    }
+    public function delete($id)
+    {
+        return VaultAssign::where('id', $id)->delete();
+    }
 
     public function findActiveVaultAssignUserByVaultId($vaultId)
     {
@@ -19,7 +27,7 @@ class VaultAssignRepository
     }
     public function getAssignVaultByUserIdAndVaultId($userId, $vaultId)
     {
-        return VaultAssign::where('user_id', $userId)->where('vault_id', $vaultId)->get();
+        return VaultAssign::with('user')->where('user_id', $userId)->where('vault_id', $vaultId)->get();
     }
     public function getAssignActiveVaultByUserId($userId)
     {
@@ -27,5 +35,22 @@ class VaultAssignRepository
             ->where('status', 'active')
             ->pluck('vault_id')
             ->toArray();
+    }
+    public function getAssignActiveVaultDetailsByUserId($userId)
+    {
+        return VaultAssign::where('user_id', $userId)
+            ->where('status', 'active')
+            ->get();
+    }
+    public function getAssignVaultByVaultIdAndRoleId($vaultId, $roleId)
+    {
+
+        info($vaultId);
+        info($roleId);
+        return VaultAssign::where('vault_id', $vaultId)
+            ->where('status', 'active')
+            ->whereJsonContains('roles', $roleId)
+            ->with('user:id,name,email,status')
+            ->get(['user_id', 'roles']);
     }
 }

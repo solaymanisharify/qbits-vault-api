@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CreateUserRequest;
 use App\Http\Requests\PermissionRequest;
 use App\Models\User;
+use App\Models\Vault;
 use Illuminate\Http\Request;
 use App\Models\VaultAssign;
+use App\Services\ActivityLoggerService;
 use App\Services\PermissionService;
 use App\Services\UserService;
 use App\Services\VaultAssignService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -29,9 +33,9 @@ class UserController extends Controller
         return $this->userService->show($id);
     }
 
-    public function create(Request $request)
+    public function create(CreateUserRequest $request)
     {
-        return $this->userService->createUser($request->all());
+        return $this->userService->createUser($request->validated());
     }
 
     public function assignRole(Request $request, $userId)
@@ -98,6 +102,72 @@ class UserController extends Controller
         return $this->vaultAssignService->toggleVaultAssign($request, $userId);
     }
 
+    // public function updateVaultRoles(Request $request, $userId, $vaultId)
+    // {
+    //     // info("Updating vault roles for user $userId and vault $vaultId with data: " . json_encode($request->all()));
+
+    //     $request->validate([
+    //         // 'vault_id' => 'required|exists:vaults,id',
+    //         'roles'    => 'present|array',
+    //         'roles.*' => 'integer|exists:roles,id',
+    //     ]);
+
+    //     $roles   = $request->roles; 
+
+    //     $user = $this->userService->findById($userId);
+
+
+
+    //     // Get the vault assignment
+    //     $assignment = VaultAssign::where('user_id', $userId)
+    //         ->where('vault_id', $vaultId)
+    //         ->where('status', 'active')
+    //         ->first();
+
+
+    //     if (!$assignment) {
+    //         return response()->json([
+    //             'message' => 'No active vault assignment found for this user.'
+    //         ], 404);
+    //     }
+
+    //     // Current roles stored in this vault assignment
+    //     $existingRoles = $assignment->roles ?? [];
+
+    //     // Roles to ADD (in new list but not in existing)
+    //     $rolesToAdd = array_diff($roles, $existingRoles);
+
+    //     // Roles to REMOVE (in existing but not in new list)
+    //     $rolesToRemove = array_diff($existingRoles, $roles);
+
+    //     // Assign new roles via Spatie (user-level permissions)
+    //     foreach ($rolesToAdd as $roleName) {
+    //         if (!$user->hasRole($roleName)) {
+    //             $user->assignRole($roleName);
+    //         }
+    //     }
+
+    //     // Remove removed roles via Spatie
+    //     foreach ($rolesToRemove as $roleName) {
+    //         if ($user->hasRole($roleName)) {
+    //             $user->removeRole($roleName);
+    //         }
+    //     }
+
+    //     // Update JSON roles in vault_assigns table
+    //     $assignment->update([
+    //         'roles' => $roles // store the full updated array
+    //     ]);
+
+    //     return response()->json([
+    //         'message'       => 'Vault roles updated successfully',
+    //         'vault_code'      => $vaultId,
+    //         'updated_roles' => $roles,
+    //         'added'         => array_values($rolesToAdd),
+    //         'removed'       => array_values($rolesToRemove),
+    //     ]);
+    // }
+
     public function updateVaultRoles(Request $request, $userId, $vaultId)
     {
         // info("Updating vault roles for user $userId and vault $vaultId with data: " . json_encode($request->all()));
@@ -108,12 +178,11 @@ class UserController extends Controller
             'roles.*' => 'integer|exists:roles,id',
         ]);
 
-        // $vaultId = $request->vault_id;
-        $roles   = $request->roles; // array of role names e.g. ['admin', 'editor']
+        $roles   = $request->roles;
 
         $user = $this->userService->findById($userId);
 
-
+        $vault = Vault::find($vaultId);
 
         // Get the vault assignment
         $assignment = VaultAssign::where('user_id', $userId)
@@ -130,6 +199,7 @@ class UserController extends Controller
 
         // Current roles stored in this vault assignment
         $existingRoles = $assignment->roles ?? [];
+
 
         // Roles to ADD (in new list but not in existing)
         $rolesToAdd = array_diff($roles, $existingRoles);
@@ -156,6 +226,59 @@ class UserController extends Controller
             'roles' => $roles // store the full updated array
         ]);
 
+        // 5. LOOKUP NAMES ONLY FOR THE LOG TEXT
+        $addedNames   = Role::whereIn('id', $rolesToAdd)->pluck('name')->toArray();
+        $removedNames = Role::whereIn('id', $rolesToRemove)->pluck('name')->toArray();
+
+        // 9. Generate string details dynamically for the audit description sentence
+        $description = "Updated access roles for User \"{$user->name}\" in Vault \"{$vault->name}\"";
+
+        $addedRolesString   = implode(', ', $addedNames);
+        $removedRolesString = implode(', ', $removedNames);
+
+        $event_label = 'Role Updated';
+
+        if (!empty($addedNames) && !empty($removedNames)) {
+            $event_label       = 'role_updated';
+            $description = "{$addedRolesString} role(s) added and {$removedRolesString} role(s) removed from User \"{$user->name}\" for Vault \"{$vault->name}\"";
+        } elseif (!empty($addedNames)) {
+            $event_label       = 'Role added';
+            $description = "{$addedRolesString} role(s) added to User \"{$user->name}\" for Vault \"{$vault->name}\"";
+        } elseif (!empty($removedNames)) {
+            $event_label       = 'Role Removed';
+            $description = "{$removedRolesString} role(s) removed from User \"{$user->name}\" for Vault \"{$vault->name}\"";
+        } else {
+            $event_label       = 'role_reviewed';
+            $description = "Reviewed access roles for User \"{$user->name}\" in Vault \"{$vault->name}\" (No changes)";
+        }
+
+        $event = $event_label == 'Role added' ? 'created' : "deleted";
+        ActivityLoggerService::log(
+            $event,
+            'role',
+            $description,
+            [
+                'model'      => $assignment,
+                'label'      => $event_label,
+                'new_values' => $assignment->refresh()->toArray(),
+                'meta'       => [
+                    'target_user' => [
+                        'id'    => $user->id,
+                        'name'  => $user->name,
+                        'email' => $user->email,
+                    ],
+                    'vault' => [
+                        'id'   => $vault->id,
+                        'name' => $vault->name,
+                        'code' => $vault->code ?? null,
+                    ],
+                    'changes' => [
+                        'added_roles'   => array_values($addedNames),
+                        'removed_roles' => array_values($removedNames),
+                    ]
+                ]
+            ]
+        );
         return response()->json([
             'message'       => 'Vault roles updated successfully',
             'vault_code'      => $vaultId,

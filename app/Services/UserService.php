@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\Otp;
 use App\Models\User;
-use App\Models\VaultAssign;
+use App\Repositories\CashInRequiredRepository;
+use App\Repositories\CashOutRequiredRepository;
+use App\Repositories\CustodianRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\VaultAssignRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Pippa\NotificationSdkLaravel\DTOs\Recipient;
@@ -17,7 +19,15 @@ use Spatie\Permission\Models\Role;
 
 class UserService
 {
-    public function __construct(protected UserRepository $userRepository) {}
+    public function __construct(
+        protected UserRepository $userRepository,
+        protected LogService $logService,
+        protected OtpService $otpService,
+        protected VaultAssignRepository $vaultAssignRepository,
+        protected CashInRequiredRepository $cashInRequiredRepository,
+        protected CashOutRequiredRepository $cashOutRequiredRepository,
+        protected CustodianRepository $custodianRepository
+    ) {}
     public function findById($id)
     {
         return $this->userRepository->findById($id);
@@ -63,6 +73,21 @@ class UserService
         $user = $this->findById($userId);
         $user->status = $user->status === 'inactive' ? 'active' : 'inactive';
         $user->save();
+
+        $this->logService->activityLog(
+            'updated',
+            'user',
+            "User {$user->name} ({$user->email}) status changed to {$user->status}",
+            [
+                $user->toArray(),
+                [
+                    'role_name' => $user->name,
+                    'role_id' => $user->id,
+
+                ]
+            ]
+        );
+
         return successResponse("User status toggled successfully", $user, 200);
     }
 
@@ -89,6 +114,20 @@ class UserService
 
         $user->status = 'archived';
         $user->save();
+
+        $this->logService->activityLog(
+            'updated',
+            'user',
+            "User {$user->name} ({$user->email}) archived",
+            [
+                $user->toArray(),
+                [
+                    'role_name' => $user->name,
+                    'role_id' => $user->id,
+
+                ]
+            ]
+        );
 
         return successResponse("User archived successfully", $user, 200);
     }
@@ -164,7 +203,8 @@ class UserService
             return errorResponse("Token has expired", [], 422);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
+        // $user = User::where('email', $request->email)->firstOrFail();
+        $user = $this->findByEmail($request->email);
 
         $user->password = Hash::make($request->password);
         $user->save();
@@ -177,20 +217,24 @@ class UserService
     public function notVerifiedUserEmailVerification($user)
     {
 
+        $this->otpService->deleteUnusedOtpByUserId($user->id, 'email_verification');
+
         // Optional: Delete old unused OTPs
-        Otp::where('user_id', $user->id)
-            ->where('purpose', 'email_verification')
-            ->where('used', false)
-            ->delete();
+        // Otp::where('user_id', $user->id)
+        //     ->where('purpose', 'email_verification')
+        //     ->where('used', false)
+        //     ->delete();
 
         $otp = rand(100000, 999999); // 6 digit OTP
 
-        Otp::create([
-            'user_id'    => $user->id,
-            'otp'        => $otp,
-            'purpose'    => 'email_verification',
-            'expires_at' => now()->addMinutes(15),
-        ]);
+        // Otp::create([
+        //     'user_id'    => $user->id,
+        //     'otp'        => $otp,
+        //     'purpose'    => 'email_verification',
+        //     'expires_at' => now()->addMinutes(15),
+        // ]);
+
+        $this->otpService->create($user->id, $otp, 'email_verification');
 
         $response = NotificationService::send(
             new SendMessageRequest([
@@ -222,11 +266,7 @@ class UserService
         }
 
 
-        $custodians = VaultAssign::where('vault_id', $vaultId)
-            ->where('status', 'active')
-            ->whereJsonContains('roles', $custodianRoleId)
-            ->with('user:id,name,email,status')
-            ->get(['user_id', 'roles']);
+        $custodians = $this->vaultAssignRepository->getAssignVaultByVaultIdAndRoleId($vaultId, $custodianRoleId);
 
         return response()->json($custodians->pluck('user'));
     }
@@ -257,10 +297,11 @@ class UserService
         // =========================================================================
         // 1. Check Pending Cash In Verifications
         // =========================================================================
-        $pendingInVerifications = \App\Models\CashInRequiredVerifier::with(['cashIn.vault'])
-            ->where('user_id', $userId)
-            ->where('verified', false)
-            ->get();
+        $pendingInVerifications = $this->cashInRequiredRepository->getPendingVerifierByUserId($userId);
+        // $pendingInVerifications = \App\Models\CashInRequiredVerifier::with(['cashIn.vault'])
+        //     ->where('user_id', $userId)
+        //     ->where('verified', false)
+        //     ->get();
 
         foreach ($pendingInVerifications as $pivot) {
             $pendingTasks[] = [
@@ -275,10 +316,12 @@ class UserService
         // =========================================================================
         // 2. Check Pending Cash In Approvals
         // =========================================================================
-        $pendingInApprovals = \App\Models\CashInRequiredApprover::with(['cashIn.vault'])
-            ->where('user_id', $userId)
-            ->where('approved', false)
-            ->get();
+        $pendingInApprovals = $this->cashInRequiredRepository->getPendingApproveByUserId($userId);
+
+        // $pendingInApprovals = \App\Models\CashInRequiredApprover::with(['cashIn.vault'])
+        //     ->where('user_id', $userId)
+        //     ->where('approved', false)
+        //     ->get();
 
         foreach ($pendingInApprovals as $pivot) {
             $pendingTasks[] = [
@@ -293,10 +336,13 @@ class UserService
         // =========================================================================
         // 3. Check Pending Cash Out Verifications
         // =========================================================================
-        $pendingOutVerifications = \App\Models\CashoutRequiredVerifier::with(['cashOut.vault'])
-            ->where('user_id', $userId)
-            ->where('verified', false)
-            ->get();
+
+        $pendingOutVerifications = $this->cashOutRequiredRepository->getPendingVerificationByUserId($userId);
+
+        // $pendingOutVerifications = \App\Models\CashoutRequiredVerifier::with(['cashOut.vault'])
+        //     ->where('user_id', $userId)
+        //     ->where('verified', false)
+        //     ->get();
 
         foreach ($pendingOutVerifications as $pivot) {
             $pendingTasks[] = [
@@ -311,10 +357,12 @@ class UserService
         // =========================================================================
         // 4. Check Pending Cash Out Approvals
         // =========================================================================
-        $pendingOutApprovals = \App\Models\CashoutRequiredApprover::with(['cashOut.vault'])
-            ->where('user_id', $userId)
-            ->where('approved', false)
-            ->get();
+        $pendingOutApprovals = $this->cashOutRequiredRepository->getPendingApproveByUserId($userId);
+
+        // $pendingOutApprovals = \App\Models\CashoutRequiredApprover::with(['cashOut.vault'])
+        //     ->where('user_id', $userId)
+        //     ->where('approved', false)
+        //     ->get();
 
         foreach ($pendingOutApprovals as $pivot) {
             $pendingTasks[] = [
@@ -330,10 +378,8 @@ class UserService
         // =========================================================================
         // 4. Check Pending Custodain Approvals
         // =========================================================================
-        $pendingCustodianApprovals = \App\Models\CustodianCashHistory::with(['vault'])
-            ->where('custodian_id', $userId)
-            ->where('status', 'pending')
-            ->get();
+
+        $pendingCustodianApprovals = $this->custodianRepository->getPendingCustodianApprovalsByUserId($userId);
 
         foreach ($pendingCustodianApprovals as $pivot) {
             $pendingTasks[] = [
@@ -344,15 +390,9 @@ class UserService
                 'table'       => 'custodian_cash_histories'
             ];
         }
-
-        // =========================================================================
         // 5. Fetch Valid Fallback Successors
         // =========================================================================
-        $fallbackUsers = User::where('id', '!=', $userId)
-            ->where('status', 'active')
-            ->where('verified', true)
-            ->select('id', 'name', 'email')
-            ->get();
+        $fallbackUsers = $this->userRepository->getAllActiveUsersWithoutSpecificId($userId);
 
         $data = [
             'can_archive'    => empty($pendingTasks),

@@ -10,6 +10,8 @@ class ReconcileRepository
     public function index($filters = [])
     {
 
+        $user = auth()->user();
+
         $query = Reconciliation::query();
 
         $query->with([
@@ -20,6 +22,16 @@ class ReconcileRepository
             'varianceBags:id,vault_id,barcode,rack_number',
             'vault:id,vault_code,name',
         ]);
+
+        if (!$user->hasRole('super-admin')) {
+
+            // Force the cash_ins query to match an active row in the vault_assigns table
+            $query->whereHas('vault.assignments', function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->where('status', 'active');
+            });
+        }
+
 
         // === Status filters (indexed) ===
         if (!empty($filters['status'])) {

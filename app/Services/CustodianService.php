@@ -12,4 +12,8 @@ class CustodianService
     {
         return $this->custodianRepository->verifyReceivedCash($cashOutId);
     }
+    public function getPendingCustodianApprovalsByUserId($userId)
+    {
+        return $this->custodianRepository->getPendingCustodianApprovalsByUserId($userId);
+    }
 }

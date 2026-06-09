@@ -6,71 +6,13 @@ use App\Models\Vault;
 use App\Models\VaultAssign;
 use App\Models\VaultBag;
 use App\Services\ActivityLoggerService;
+use App\Services\LogService;
+use App\Services\VaultBagService;
 
 class VaultRepository
 {
 
-    // public function index(array $filters = [], int $perPage = 15)
-    // {
-    //     $sortBy  = in_array($filters['sort_by'] ?? '', ['name', 'balance', 'created_at', 'total_bags'])
-    //         ? $filters['sort_by']
-    //         : 'created_at';
-    //     $sortDir = ($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-
-
-    //     $query = Vault::query()
-    //         ->select([
-    //             'id',
-    //             'vault_code',
-    //             'name',
-    //             'address',
-    //             'balance',
-    //             'bag_min_bal_limit',
-    //             'bag_balance_limit',
-    //             'total_racks',
-    //             'total_bags',
-    //             'last_cash_in',
-    //             'last_cash_out',
-    //             'status',
-    //             'created_at',
-    //         ])
-    //         ->withCount('bags')
-    //         ->with(['bags:id,vault_id,barcode,bag_identifier_barcode,rack_number,current_amount,is_active,is_sealed'])
-    //         ->when($filters['search'] ?? null, function ($q, $search) {
-    //             // Wrap in a grouped where so OR doesn't bleed into other clauses
-    //             $q->where(function ($q2) use ($search) {
-    //                 $q2->where('name',     'like', "%{$search}%")
-    //                     ->orWhere('vault_code', 'like', "%{$search}%")
-    //                     ->orWhere('address', 'like', "%{$search}%");
-    //             });
-    //         })
-    //         ->when($filters['user_id'] ?? null, fn($q, $id) => $q->where('user_id', $id))
-    //         ->when($filters['status']  ?? null, function ($q, $status) {
-    //             $isOpen = filter_var($status, FILTER_VALIDATE_BOOLEAN);
-    //             $q->whereJsonPath('status.open', '=', $isOpen);
-    //         })
-    //         ->orderBy($sortBy, $sortDir);
-
-    //     $user = auth()->user();
-
-    //     // Check your role naming here. 
-    //     // If your superadmin role is called 'super_admin', change this string to 'super_admin'
-    //     if (!$user->hasRole('super-admin')) {
-
-    //         // Force the cash_ins query to match an active row in the vault_assigns table
-    //         $query->whereHas('vault.assignments', function ($q) use ($user) {
-    //             $q->where('user_id', $user->id)
-    //                 ->where('status', 'active');
-    //         });
-    //     }
-
-    //     $results = $perPage ? $query->paginate($perPage) : $query->get();
-    //     return successResponse(
-    //         "Successfully retrieved vaults",
-    //         $results,
-    //         200
-    //     );
-    // }
+    public function __construct(protected VaultBagService $vaultBagService, protected LogService $logService) {}
 
     public function index(array $filters = [], int $perPage = 15)
     {
@@ -139,9 +81,7 @@ class VaultRepository
 
         return successResponse('Successfully retrieved vaults', $results, 200);
     }
-    /**
-     * Store a new vault in database.  
-     */
+
     public function store($data)
     {
         return Vault::create($data);
@@ -264,12 +204,15 @@ class VaultRepository
                     $existingBag->update(['is_active' => false, 'deleted_reason' => 'Removed during vault update']);
                     $existingBag->delete(); // soft delete
 
-                    ActivityLoggerService::deleted(
-                        $existingBag,
+                    // Log
+                    $this->logService->activityLog(
+                        'deleted',
                         'bag',
-                        $existingBag->barcode,
-                        'Removed during vault update',
-                        ['vault_id' => $vault->id, 'vault_name' => $vault->name]
+                        "Removed during vault update",
+                        [
+                            $existingBag->barcode,
+                            ['vault_id' => $vault->id, 'vault_name' => $vault->name]
+                        ]
                     );
 
                     $deletedBarcodes[] = $existingBag->barcode;
@@ -278,9 +221,8 @@ class VaultRepository
 
             // ── 4. Upsert incoming bags ───────────────────────────────────────
             foreach ($incomingBags as $bagData) {
-                $existingBag = VaultBag::where('vault_id', $vault->id)
-                    ->where('barcode', $bagData['barcode'])
-                    ->first();
+
+                $existingBag = $this->vaultBagService->findVaultbagWithBarcodeAndVaultId($vault->id, $bagData['barcode']);
 
                 if ($existingBag) {
                     // --- Update existing bag ---
@@ -299,20 +241,21 @@ class VaultRepository
                     if (!empty($updatePayload)) {
                         $existingBag->update($updatePayload);
 
-                        $existingBag->appendHistory('updated', 'Bag fields updated', ['changes' => $changes]);
-
-                        ActivityLoggerService::updated(
-                            $existingBag,
+                        // Log
+                        $this->logService->activityLog(
+                            'updated',
                             'bag',
                             $existingBag->barcode,
-                            $oldBagSnap,
-                            $existingBag->fresh()->toArray(),
-                            ['vault_id' => $vault->id]
+                            [
+                                $oldBagSnap,
+                                $existingBag->fresh()->toArray(),
+                                ['vault_id' => $vault->id]
+                            ]
                         );
                     }
                 } else {
-                    // --- Create new bag ---
-                    $newBag = VaultBag::create([
+
+                    $payload = [
                         'vault_id'               => $vault->id,
                         'barcode'                => $bagData['barcode'],
                         'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? null,
@@ -320,19 +263,17 @@ class VaultRepository
                         'current_amount'         => $bagData['current_amount'] ?? 0,
                         'is_active'              => true,
                         'is_sealed'              => false,
-                    ]);
+                    ];
 
-                    $newBag->appendHistory('created', 'Bag created and added to vault', [
-                        'vault_id'   => $vault->id,
-                        'vault_name' => $vault->name,
-                    ]);
+                    $newBag = $this->vaultBagService->store($payload);
 
-                    ActivityLoggerService::created(
-                        $newBag,
+                    $this->logService->activityLog(
+                        'created',
                         'bag',
-                        $newBag->barcode,
-                        $newBag->toArray(),
-                        ['vault_id' => $vault->id]
+                        "New Bag #$newBag->barcode",
+                        [
+                            $newBag->toArray(),
+                        ]
                     );
                 }
             }
@@ -348,14 +289,16 @@ class VaultRepository
             'total_bags' => $totalBags,
         ]);
 
-        // ── 6. Log vault update ───────────────────────────────────────────────
-        ActivityLoggerService::updated(
-            $vault,
+
+        $this->logService->activityLog(
+            'updated',
             'vault',
             $vault->name,
-            $oldSnap,
-            $vault->fresh()->toArray(),
-            ['bags_deleted' => $deletedBarcodes]
+            [
+                $oldSnap,
+                $vault->fresh()->toArray(),
+                ['bags_deleted' => $deletedBarcodes]
+            ]
         );
 
         return [

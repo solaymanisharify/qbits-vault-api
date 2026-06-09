@@ -8,11 +8,19 @@ use App\Repositories\VaultAssignRepository;
 
 class VaultAssignService
 {
-    public function __construct(protected VaultAssignRepository $vaultAssignRepository) {}
+    public function __construct(protected VaultAssignRepository $vaultAssignRepository, protected LogService $logService, protected UserService $userService) {}
 
     public function create($data)
     {
         return $this->vaultAssignRepository->create($data);
+    }
+    public function update($data, $id)
+    {
+        return $this->vaultAssignRepository->update($data, $id);
+    }
+    public function delete($id)
+    {
+        return $this->vaultAssignRepository->delete($id);
     }
     public function findActiveVaultAssignUserByVaultId($vaultId)
     {
@@ -27,12 +35,25 @@ class VaultAssignService
         return $this->vaultAssignRepository->getAssignActiveVaultByUserId($userId);
     }
 
+    public function getAssignVaultByVaultIdAndRoleId($vaultId, $roleId)
+    {
+        return $this->vaultAssignRepository->getAssignVaultByVaultIdAndRoleId($vaultId, $roleId);
+    }
+
+    public function getAssignActiveVaultDetailsByUserId(int $userId)
+    {
+        return $this->vaultAssignRepository->getAssignActiveVaultDetailsByUserId($userId);
+    }
+
+
     public function toggleVaultAssign($request, $userId)
     {
 
         $vaultId = $request->vault_id;
 
         $existing = $this->vaultAssignRepository->getAssignVaultByUserIdAndVaultId($userId, $vaultId)->first();
+
+        $user = $this->userService->findById($userId);
 
         // $existing = VaultAssign::where('user_id', $userId)
         //     ->where('vault_id', $vaultId)
@@ -45,6 +66,15 @@ class VaultAssignService
             $existing->update([
                 'status' => $newStatus
             ]);
+
+            $this->logService->activityLog(
+                'updated',
+                'user',
+                "User {$user->name} ({$user->email}) assign {$newStatus} to this vault {$vaultId} ",
+                []
+            );
+
+
 
             return response()->json([
                 'message' => $newStatus === 'active'

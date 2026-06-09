@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\User;
 use App\Services\ActivityLoggerService;
+use App\Services\LogService;
 use App\Services\RoleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Spatie\Permission\Models\Permission;
 
 class UserRepository
 {
-    public function __construct(protected RoleService $roleService) {}
+    public function __construct(protected RoleService $roleService, protected LogService $logService) {}
 
     public function index($request = null)
     {
@@ -94,71 +95,6 @@ class UserRepository
         ]);
     }
 
-    // public function createUser($request)
-    // {
-    //     $currentUser = Auth::user();
-
-    //     $roleData = $request['role'] ?? [];
-
-    //     if (!is_array($roleData)) {
-    //         $roleData = json_decode($roleData, true) ?? [];
-    //     }
-
-    //     // Validate that role field exists and is an array
-    //     // if (!isset($request->role) || !is_array($request->role) || empty($request->role)) {
-    //     //     return response()->json([
-    //     //         'error' => 'At least one role must be selected'
-    //     //     ], 422);
-    //     // }
-
-    //     // Get all role objects from the provided role IDs
-    //     $roles = $this->roleService->find($request['role']);
-
-    //     // If roleService doesn't have findMultiple, use this instead:
-    //     // $roles = Role::whereIn('id', $request->role)->get();
-
-    //     if ($roles->isEmpty()) {
-    //         return response()->json([
-    //             'error' => 'Invalid roles provided'
-    //         ], 422);
-    //     }
-
-    //     // Authorization check for Admin users
-    //     if ($currentUser->hasRole('Admin')) {
-    //         // Check if any of the roles being assigned is Super Admin
-    //         $hasRestrictedRole = $roles->contains(function ($role) {
-    //             return in_array($role->name, ['Super Admin', 'super_admin']);
-    //         });
-
-    //         if ($hasRestrictedRole) {
-    //             return response()->json([
-    //                 'error' => 'Admins cannot assign Super Admin role'
-    //             ], 403);
-    //         }
-    //     }
-
-    //     // Create the new user
-    //     $newUser = User::create([
-    //         'name' => $request["name"],
-    //         'email' => $request["email"],
-    //         'password' => bcrypt($request["password"]),
-    //     ]);
-
-    //     // Assign all roles to the user
-    //     $roleNames = $roles->pluck('name')->toArray();
-    //     $newUser->assignRole($roleNames);
-
-    //     // Alternative: If using Spatie, you can assign multiple roles at once
-    //     // $newUser->assignRole($roles->pluck('name')->toArray());
-
-    //     // Load roles relationship for response
-    //     $newUser->load('roles');
-
-    //     return response()->json([
-    //         'message' => 'User created successfully',
-    //         'user' => $newUser
-    //     ], 201);
-    // }
     public function createUser($request)
     {
         $currentUser = Auth::user();
@@ -179,7 +115,7 @@ class UserRepository
         if ($currentUser->hasRole('Admin')) {
             $hasRestrictedRole = $roles->contains(
                 fn($role) =>
-                in_array($role->name, ['Super Admin', 'super_admin'])
+                in_array($role->name, ['Super Admin', 'super_admin', 'super-admin'])
             );
 
             if ($hasRestrictedRole) {
@@ -187,21 +123,16 @@ class UserRepository
             }
         }
 
-        // ====================== FIXED IMAGE HANDLING ======================
         $imagePath = null;
 
         // Support both Request object and Array input
         if (is_object($request) && method_exists($request, 'hasFile')) {
-            // $request is Illuminate\Http\Request
             if ($request->hasFile('profile_image')) {
                 $imagePath = $request->file('profile_image')->store('users/profile', 'public');
             } elseif ($request->hasFile('avatar')) {
                 $imagePath = $request->file('avatar')->store('users/profile', 'public');
             }
         } elseif (is_array($request)) {
-            // $request is array (most likely from $request->all() or validated data)
-            // Files are usually not present in array, but we keep the check for future
-            // If you're sending file via FormData, controller should pass full $request
         }
 
         // Create User
@@ -219,105 +150,22 @@ class UserRepository
 
         $newUser->load('roles');
 
-        ActivityLoggerService::created(
-            $newUser,
+        $this->logService->activityLog(
+            'created',
             'user',
-            "User {$newUser->name} ({$newUser->email})",
+            "User {$newUser->name} ({$newUser->email}) with roles: " . implode(', ', $roleNames),
             [
                 'name'   => $newUser->name,
                 'email'  => $newUser->email,
-                'status' => $newUser->status
-            ], // Filtered new_values (exclude password bcrypt!)
-            [
+                'status' => $newUser->status,
                 'assigned_roles' => $roleNames,
                 'assigned_by'    => Auth::user()?->email ?? 'System'
             ]
         );
 
+
         return successResponse("User created successfully", $newUser, 201);
     }
-    // public function update($request, $id)
-    // {
-    //     $user = User::findOrFail($id);
-
-    //     // Update basic fields if provided
-    //     if ($request->has('name')) {
-    //         $user->name = $request->name;
-    //     }
-    //     if ($request->has('email')) {
-    //         $user->email = $request->email;
-    //     }
-    //     if ($request->has('status')) {
-    //         $user->status = $request->status;
-    //     }
-
-    //     $user->save();
-
-    //     // Handle permission overrides
-    //     if ($request->has('permissions')) {
-    //         // Get all permissions from user's roles
-    //         $rolePermissionIds = $user->roles()
-    //             ->with('permissions')
-    //             ->get()
-    //             ->pluck('permissions')
-    //             ->flatten()
-    //             ->pluck('id')
-    //             ->unique()
-    //             ->toArray();
-
-    //         // Requested permissions from frontend
-    //         $requestedPermissionIds = $request->permissions;
-
-    //         // Clear all existing overrides for this user
-    //         DB::table('user_permission_overrides')
-    //             ->where('user_id', $user->id)
-    //             ->delete();
-
-    //         // Get all available permissions
-    //         $allPermissions = Permission::all();
-
-    //         foreach ($allPermissions as $permission) {
-    //             $isInRole = in_array($permission->id, $rolePermissionIds);
-    //             $isRequested = in_array($permission->id, $requestedPermissionIds);
-
-    //             // Add override only if different from role
-    //             if ($isInRole && !$isRequested) {
-    //                 // Permission in role but user shouldn't have it → DENY override
-    //                 DB::table('user_permission_overrides')->insert([
-    //                     'user_id' => $user->id,
-    //                     'permission_id' => $permission->id,
-    //                     'granted' => false,
-    //                     'created_at' => now(),
-    //                     'updated_at' => now(),
-    //                 ]);
-    //             } elseif (!$isInRole && $isRequested) {
-    //                 // Permission NOT in role but user should have it → GRANT override
-    //                 DB::table('user_permission_overrides')->insert([
-    //                     'user_id' => $user->id,
-    //                     'permission_id' => $permission->id,
-    //                     'granted' => true,
-    //                     'created_at' => now(),
-    //                     'updated_at' => now(),
-    //                 ]);
-    //             }
-    //             // If both true or both false → no override needed (role handles it)
-    //         }
-    //     }
-
-    //     // Return updated user with permissions
-    //     $user->load(['roles.permissions', 'permissions']);
-
-    //     // Add overrides to response
-    //     $effectivePermissions = $user->getEffectivePermissions();
-
-    //     return response()->json([
-    //         'message' => 'User updated successfully',
-    //         'data' => array_merge($user->toArray(), [
-    //             'effective_permissions' => $effectivePermissions
-    //         ])
-    //     ]);
-    // }
-
 
     public function update($request, $id)
     {
@@ -333,37 +181,6 @@ class UserRepository
         if (isset($data['status'])) $user->status = $data['status'];
         if (isset($data['default_vault_id'])) $user->default_vault_id = $data['default_vault_id'];
 
-
-
-        // 2. Handle Current Address (Nested Data)
-        // if (isset($data['current'])) {
-        //     $current = $data['current'];
-        //     $user->current_address  = $current['street']   ?? $user->current_address;
-        //     $user->current_division = $current['division'] ?? $user->current_division;
-        //     $user->current_district = $current['district'] ?? $user->current_district;
-        //     $user->current_thana    = $current['upazila']  ?? $user->current_thana;
-        // }
-
-        // // 3. Handle Permanent Address (Nested Data)
-        // if (isset($data['permanent'])) {
-        //     $permanent = $data['permanent'];
-        //     $user->permanent_address  = $permanent['street']   ?? $user->permanent_address;
-        //     $user->permanent_division = $permanent['division'] ?? $user->permanent_division;
-        //     $user->permanent_district = $permanent['district'] ?? $user->permanent_district;
-        //     $user->permanent_thana    = $permanent['upazila']  ?? $user->permanent_thana;
-        // }
-
-        // 4. Handle Profile Image Update (Only if $request is the Request object)
-        // if (!is_array($request)) {
-        //     if ($request->hasFile('img') || $request->hasFile('avatar')) {
-        //         $image = $request->file('img') ?? $request->file('avatar');
-        //         if ($user->img) {
-        //             Storage::disk('public')->delete($user->img);
-        //         }
-        //         $user->img = $image->store('users/profile', 'public');
-        //     }
-        // }
-        // 4. Handle Image Updates (Profile & KYC)
 
         // info("Handling file uploads for user update...");
         // Mapping of field name to database column
@@ -520,5 +337,20 @@ class UserRepository
         $user->save();
 
         return $user;
+    }
+
+    public function checkUserPhoneNumberExistenceByUserId($phone)
+    {
+        return User::where('phone', $phone)
+            ->where('id', '!=', $userId)
+            ->exists();
+    }
+    public function getAllActiveUsersWithoutSpecificId($userId)
+    {
+        return User::where('id', '!=', $userId)
+            ->where('status', 'active')
+            ->where('verified', true)
+            ->select('id', 'name', 'email')
+            ->get();
     }
 }

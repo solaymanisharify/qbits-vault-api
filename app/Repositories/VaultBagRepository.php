@@ -16,6 +16,13 @@ class VaultBagRepository
         return VaultBag::withTrashed()->findOrFail($bagId);
     }
 
+    public function findVaultbagWithBarcodeAndVaultId($vaultId, $barcode)
+    {
+        return VaultBag::where('vault_id', $vaultId)
+            ->where('barcode', $barcode)
+            ->first();
+    }
+
     public function getBagById($id, $search = null)
     {
         try {

@@ -17,6 +17,10 @@ class VaultBagService
     {
         return $this->vaultBagRepository->findVaultbagWithTrashedByBagId($data);
     }
+    public function findVaultbagWithBarcodeAndVaultId($vaultId, $barcode)
+    {
+        return $this->vaultBagRepository->findVaultbagWithBarcodeAndVaultId($vaultId, $barcode);
+    }
 
     public function getBagById($request, $id)
     {
@@ -186,5 +190,5 @@ class VaultBagService
     {
         return $this->vaultBagRepository->getBagByBagId($id);
     }
-   
 }
+

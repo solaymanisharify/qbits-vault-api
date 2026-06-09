@@ -9,6 +9,7 @@ class CustodianRepository
 
     public function __construct(protected CustodianCashHistory $model) {}
 
+
     public function verifyReceivedCash($cashOutId)
     {
         $custodianHistory = $this->model->where('cash_out_id', $cashOutId)->where('status', 'pending')->first();
@@ -21,5 +22,13 @@ class CustodianRepository
         ]);
 
         return successResponse("Successfully verified received cash", $custodianHistory, 200);
+    }
+
+    public function getPendingCustodianApprovalsByUserId($userId)
+    {
+        return $this->model::with(['vault'])
+            ->where('custodian_id', $userId)
+            ->where('status', 'pending')
+            ->get();
     }
 }

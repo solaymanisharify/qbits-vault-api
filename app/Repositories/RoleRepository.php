@@ -2,12 +2,15 @@
 
 namespace App\Repositories;
 
+use App\Services\ActivityLoggerService;
+use App\Services\LogService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
 class RoleRepository
 {
-    public function __construct(protected Role $model) {}
+    public function __construct(protected Role $model, protected LogService $logService) {}
 
     public function index($request = null)
     {
@@ -39,12 +42,65 @@ class RoleRepository
     {
         return $this->model->create($data);
     }
-    public function update($data, $id)
+    public function update(array $data, int $id)
     {
-        return $this->find($id)->update($data);
+        // 1. Fetch the existing model before it updates
+        $role = $this->find($id);
+
+        if (!$role) {
+            return errorResponse('Role not found', [], 404);
+        }
+
+        // 2. Capture the state BEFORE the change
+        $oldValues = $role->toArray();
+
+        // 3. Perform the update on the instance
+        $role->update($data);
+
+        // 4. Capture the state AFTER the change
+        $newValues = $role->refresh()->toArray();
+
+        // 5. Fire your standard-compliant audit log
+        ActivityLoggerService::updated(
+            $role,
+            'role',
+            "Role \"{$role->name}\" (ID: #{$role->id})",
+            $oldValues,
+            $newValues
+        );
+
+        return successResponse("Role updated successfully", $role);
     }
-    public function delete($id)
+    public function delete(int $id)
     {
-        return $this->find($id)->delete();
+
+        $role = $this->find($id);
+
+        if ($role instanceof Collection) {
+            $role = $role->first();
+        }
+
+        if (!$role) {
+            return errorResponse('Role not found or already deleted', [], 404);
+        }
+
+        $this->logService->activityLog(
+            'deleted',
+            'role',
+            "Deleted Role #{$role->name}",
+            [
+                $role->toArray(),
+                [
+                    'role_name' => $role->name,
+                    'role_id' => $role->id,
+
+                ]
+            ]
+        );
+
+        // 3. Perform the actual deletion
+        $role->delete();
+
+        return successResponse("Role deleted successfully");
     }
 }

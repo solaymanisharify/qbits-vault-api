@@ -4,68 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Services\ActivityLoggerService;
+use App\Services\LogService;
 use App\Services\VaultBagService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class ActivityLogController extends Controller
 {
-    public function __construct(protected VaultBagService $vaultBagService, protected ActivityLoggerService $cashInService) {}
-    public function index(Request $request): JsonResponse
+    public function __construct(protected VaultBagService $vaultBagService, protected ActivityLoggerService $cashInService, protected LogService $logService) {}
+    public function index(Request $request)
     {
-        $user = auth()->user();
-        $query = ActivityLog::query()->orderByDesc('created_at');
-
-        $hasGlobalViewAccess = $user->hasRole('super-admin') || $user->hasRole('admin');
-
-        if (!$hasGlobalViewAccess) {
-            // Regular users are strictly hard-locked to their own logs
-            $query->forUser($user->id);
-        } else {
-            // Admins can optionally filter by a targeted user_id if supplied
-            if ($userId = $request->user_id) {
-                $query->forUser($userId);
-            }
-        }
-
-        // 2. Structural Dynamic Parameters Filtering
-        if ($module = $request->module) {
-            $query->where('module', $module);
-        }
-
-        if ($event = $request->event) {
-            $query->where('event', $event);
-        }
-
-        if ($request->filled(['subject_type', 'subject_id'])) {
-            $query->forSubject($request->subject_type, $request->subject_id);
-        }
-
-        if ($search = $request->search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('description',   'like', "%{$search}%")
-                    ->orWhere('subject_label', 'like', "%{$search}%")
-                    ->orWhere('user_name',    'like', "%{$search}%");
-            });
-        }
-
-        // 3. Performance Optimization: High-efficiency raw index execution instead of whereDate
-        if ($from = $request->from) {
-            $query->where('created_at', '>=', $from . ' 00:00:00');
-        }
-
-        if ($to = $request->to) {
-            $query->where('created_at', '<=', $to . ' 23:59:59');
-        }
-
-        // 4. Bound Pagination Limit Protection Guardrail
-        $perPage = min((int) ($request->get('per_page', 25)), 100);
-        $logs    = $query->paginate($perPage);
-
-        return response()->json([
-            'success' => true,
-            'data'    => $logs,
-        ]);
+        return  $this->logService->index($request);
     }
 
     public function BagHistory(int $bagId): JsonResponse

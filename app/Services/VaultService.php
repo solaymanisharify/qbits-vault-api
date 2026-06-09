@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class VaultService
 {
-    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService, protected VaultAuditConfigService $vaultAuditConfigService) {}
+    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService, protected VaultAuditConfigService $vaultAuditConfigService, protected LogService $logService) {}
 
     public function getAll(array $filters = [])
     {
@@ -18,42 +18,15 @@ class VaultService
         return $this->repository->index($filters, $perPage);
     }
 
-    // public function store($data)
-    // {
-    //     $vault = $this->repository->store($data);
-
-    //     $vaultBalance = 0;
-
-    //     foreach ($data["bags"] as $bag) {
-    //         $data["vault_id"] = $vault->id;
-    //         $data["barcode"] = $bag["barcode"];
-    //         $data["bag_identifier_barcode"] = $bag["bag_identifier_barcode"];
-    //         $data["rack_number"] = rand(1, 3);
-    //         $data["current_amount"] = $bag["current_amount"];
-
-    //         $this->vaultBagService->store($data);
-
-    //         $vaultBalance += $bag["current_amount"];
-    //     }
-
-    //     $data["balance"] = $vaultBalance;
-
-    //     $this->repository->update($vault->id, $data);
-
-    //     $vaultAuditConfig["vault_id"] = $vault->id;
-    //     $this->vaultAuditConfigService->create($vaultAuditConfig);
-
-    //     return successResponse("Successfully created vault", $vault, 201);
-    // }
-
     public function store($data)
     {
         // 1. Start the DB Transaction
         DB::beginTransaction();
 
         try {
-            // Store the main vault record
             $vault = $this->repository->store($data);
+
+            $this->logService->activityLog('created', 'vault', "New Vault #{$vault->name} ($vault->vault_code)");
 
             $vaultBalance = 0;
 
@@ -65,7 +38,12 @@ class VaultService
                 $data["rack_number"] = rand(1, 3);
                 $data["current_amount"] = $bag["current_amount"];
 
-                $this->vaultBagService->store($data);
+                $newBag = $this->vaultBagService->store($data);
+
+                $this->logService->activityLog('created', 'bag', "New bag #{$newBag->barcode} created for ($vault->name)", [
+                    $newBag->barcode,
+                    ['vault_id' => $vault->id, 'bag_id' => $newBag->barcode]
+                ]);
 
                 $vaultBalance += $bag["current_amount"];
             }
@@ -78,7 +56,6 @@ class VaultService
             $vaultAuditConfig["vault_id"] = $vault->id;
             $this->vaultAuditConfigService->create($vaultAuditConfig);
 
-            // 2. Commit changes if everything succeeds
             DB::commit();
 
             return successResponse("Successfully created vault", $vault, 201);
@@ -86,10 +63,6 @@ class VaultService
             // 3. Rollback changes if anything fails
             DB::rollBack();
 
-            // Optional: Log the error for debugging purposes
-            // Log::error('Vault creation failed: ' . $e->getMessage());
-
-            // Return your error response wrapper (adjust helper name/arguments to match your project)
             return errorResponse("Failed to create vault: " . $e->getMessage(), 500);
         }
     }
@@ -136,3 +109,4 @@ class VaultService
         return successResponse('Vault deleted successfully.', $vault, 200);
     }
 }
+

@@ -16,4 +16,18 @@ class CashOutRequiredRepository
     {
         return CashoutRequiredApprover::create($data);
     }
+    public function getPendingVerificationByUserId($userId)
+    {
+        return CashoutRequiredVerifier::with(['cashOut.vault'])
+            ->where('user_id', $userId)
+            ->where('verified', false)
+            ->get();
+    }
+    public function getPendingApproveByUserId($userId)
+    {
+        return CashoutRequiredApprover::with(['cashOut.vault'])
+            ->where('user_id', $userId)
+            ->where('approved', false)
+            ->get();
+    }
 }

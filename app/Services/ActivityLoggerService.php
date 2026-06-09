@@ -9,20 +9,19 @@ use Illuminate\Support\Facades\Request;
 class ActivityLoggerService
 {
     /**
-     * Log any event.
+     * Log any application event automatically calculating models mutations.
      *
-     * @param string      $event        e.g. 'created', 'updated', 'deleted', 'cash_in', 'custom'
-     * @param string      $module       e.g. 'vault', 'bag', 'transaction'
-     * @param string      $description  Human-readable sentence
-     * @param array       $options      Extra options:
-     *   - subject_type  string   FQCN of model e.g. App\Models\VaultBag
-     *   - subject_id    int
-     *   - subject_label string   Human label e.g. "SM001"
-     *   - old_values    array
-     *   - new_values    array
-     *   - meta          array    Any extra context
-     *   - user_id       int      Override authenticated user
-     *   - user_name     string   Override user name
+     * @param string      $event        e.g., 'created', 'updated', 'deleted', 'cash_in', 'reconciled'
+     * @param string      $module       e.g., 'role', 'vault_management', 'user_management'
+     * @param string      $description  The explicit human-readable description sentence
+     * @param array       $options      Contextual payload arrays:
+     * - model         object   The Eloquent model instance involved
+     * - label         string   Readable fallback marker if model object isn't parsed
+     * - old_values    array    Snapshot before action
+     * - new_values    array    Snapshot after action
+     * - meta          array    Extra payload context variables
+     * - user_id       int      Override authenticated runner ID
+     * - user_name     string   Override runner name string
      */
     public static function log(
         string $event,
@@ -34,69 +33,72 @@ class ActivityLoggerService
         $userId   = $options['user_id']   ?? $user?->id;
         $userName = $options['user_name'] ?? $user?->name ?? 'System';
 
+        // 1. Unpack model parameters automatically if provided
+        $model        = $options['model'] ?? null;
+        $subjectType  = $model ? get_class($model) : null;
+        $subjectId    = $model ? $model->id : ($options['subject_id'] ?? null);
+        $subjectLabel = $options['label'] ?? ($options['subject_label'] ?? null);
+
+        $oldValues    = $options['old_values'] ?? null;
+        $newValues    = $options['new_values'] ?? null;
+        $meta         = $options['meta'] ?? [];
+
+        // 2. Automatically capture dataset states if missing based on event
+        if ($model && !$newValues && in_array($event, ['created', 'updated'])) {
+            $newValues = $model->toArray();
+        }
+        if ($model && !$oldValues && $event === 'deleted') {
+            $oldValues = $model->toArray();
+        }
+
+        // 3. Automatically calculate differences ('diff') if an update occurred
+        if (!empty($oldValues) && !empty($newValues) && $event === 'updated') {
+            $diff = [];
+            foreach ($newValues as $key => $val) {
+                if (($oldValues[$key] ?? null) != $val) {
+                    $diff[$key] = ['from' => $oldValues[$key] ?? null, 'to' => $val];
+                }
+            }
+            if (!empty($diff)) {
+                $meta['diff'] = $diff;
+            }
+        }
+
+        // 4. Sanitize and filter passwords or credentials before saving to audit history
+        $oldValues = $oldValues ? self::sanitize($oldValues) : null;
+        $newValues = $newValues ? self::sanitize($newValues) : null;
+        $meta      = !empty($meta) ? self::sanitize($meta) : null;
+
         return ActivityLog::create([
             'user_id'       => $userId,
             'user_name'     => $userName,
-            'subject_type'  => $options['subject_type']  ?? null,
-            'subject_id'    => $options['subject_id']    ?? null,
-            'subject_label' => $options['subject_label'] ?? null,
+            'subject_type'  => $subjectType,
+            'subject_id'    => $subjectId,
+            'subject_label' => $subjectLabel,
             'event'         => $event,
             'module'        => $module,
             'description'   => $description,
-            'old_values'    => $options['old_values']    ?? null,
-            'new_values'    => $options['new_values']    ?? null,
-            'meta'          => $options['meta']          ?? null,
+            'old_values'    => $oldValues,
+            'new_values'    => $newValues,
+            'meta'          => $meta,
             'ip_address'    => Request::ip(),
             'user_agent'    => Request::userAgent(),
         ]);
     }
 
-    // ── Convenience wrappers ──────────────────────────────────────────────────
-
-    public static function created($model, string $module, string $label, array $newValues = [], array $meta = []): ActivityLog
+    /**
+     * Sanitizes data structures removing sensitive values from database logs.
+     */
+    private static function sanitize(array $data): array
     {
-        return self::log('created', $module, "Created {$label}", [
-            'subject_type'  => get_class($model),
-            'subject_id'    => $model->id,
-            'subject_label' => $label,
-            'new_values'    => $newValues ?: $model->toArray(),
-            'meta'          => $meta,
-        ]);
-    }
-
-    public static function updated($model, string $module, string $label, array $oldValues, array $newValues, array $meta = []): ActivityLog
-    {
-        // Only store changed fields
-        $diff = [];
-        foreach ($newValues as $key => $val) {
-            if (($oldValues[$key] ?? null) != $val) {
-                $diff[$key] = ['from' => $oldValues[$key] ?? null, 'to' => $val];
+        $hiddenKeys = ['password', 'password_confirmation', 'pin', 'token', 'cvv'];
+        foreach ($data as $key => $value) {
+            if (in_array(strtolower($key), $hiddenKeys)) {
+                $data[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $data[$key] = self::sanitize($value);
             }
         }
-
-        return self::log('updated', $module, "Updated {$label}", [
-            'subject_type'  => get_class($model),
-            'subject_id'    => $model->id,
-            'subject_label' => $label,
-            'old_values'    => $oldValues,
-            'new_values'    => $newValues,
-            'meta'          => array_merge($meta, ['diff' => $diff]),
-        ]);
-    }
-
-    public static function deleted($model, string $module, string $label, string $reason = '', array $meta = []): ActivityLog
-    {
-        return self::log('deleted', $module, "Deleted {$label}" . ($reason ? " — Reason: {$reason}" : ''), [
-            'subject_type'  => get_class($model),
-            'subject_id'    => $model->id,
-            'subject_label' => $label,
-            'old_values'    => $model->toArray(),
-            'meta'          => array_merge($meta, ['reason' => $reason]),
-        ]);
-    }
-
-    public static function custom(string $event, string $module, string $description, array $options = []): ActivityLog
-    {
-        return self::log($event, $module, $description, $options);
+        return $data;
     }
 }

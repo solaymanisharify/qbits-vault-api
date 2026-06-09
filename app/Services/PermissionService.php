@@ -10,7 +10,8 @@ class PermissionService
     public function __construct(
         protected PermissionRepository $permissionRepository,
         protected RoleService $roleService,
-        protected UserService $userService
+        protected UserService $userService,
+        protected LogService $logService
 
     ) {}
 
@@ -27,6 +28,13 @@ class PermissionService
         $user = $this->userService->findById($userId);
 
         $user->syncPermissions($permissions ?? []);
+
+        $this->logService->activityLog(
+            'updated',
+            'user',
+            "User {$user->name} ({$user->email})  permissions updated",
+            []
+        );
 
         return response()->json(['message' => 'Permissions updated successfully']);
     }
