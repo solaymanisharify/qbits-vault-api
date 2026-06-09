@@ -73,7 +73,7 @@ class VaultAuditConfigRepository
     }
     public function create($data)
     {
-        VaultAuditConfig::create($data);
+       return VaultAuditConfig::create($data);
     }
 
     public function update($data, $id)

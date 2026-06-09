@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthService
 {
-    public function __construct(protected UserRepository $userRepository, protected UserService $userService) {}
+    public function __construct(protected UserRepository $userRepository, protected UserService $userService, protected LogService $logService) {}
 
     public function create($request)
     {
@@ -106,6 +106,13 @@ class AuthService
         $user->password = Hash::make($request['newPassword']);
         $user->save();
 
+        $this->logService->activityLog(
+            'updated',
+            'user',
+            "User {$user->name} ({$user->email}) password changed",
+            []
+        );
+
         return $user;
     }
     public function superAdminChangeUserPassword($newPassword, $userId)
@@ -113,6 +120,14 @@ class AuthService
         $user = $this->userRepository->findById($userId);
         $user->password = Hash::make($newPassword["newPassword"]);
         $user->save();
+
+        $this->logService->activityLog(
+            'updated',
+            'user',
+            "User {$user->name} ({$user->email}) password changed",
+            []
+        );
+
         return $user;
     }
 }

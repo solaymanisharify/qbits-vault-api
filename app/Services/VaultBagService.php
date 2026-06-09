@@ -190,5 +190,8 @@ class VaultBagService
     {
         return $this->vaultBagRepository->getBagByBagId($id);
     }
+    public function getVaultBagByVaultid($vaultId)
+    {
+        return $this->vaultBagRepository->getVaultBagByVaultid($vaultId);
+    }
 }
-

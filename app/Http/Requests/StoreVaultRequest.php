@@ -24,7 +24,7 @@ class StoreVaultRequest extends FormRequest
             'vault_code'     => ['required', 'integer', 'unique:vaults,vault_code'],
             'name'           => ['required', 'string', 'max:255', 'unique:vaults,name'],
             'address'        => ['required', 'string'],
-            'total_racks'    => ['required', 'integer', 'min:1'],
+            'total_racks'    => ['nullable'],
             
             // Optional metrics from payload
             'current_amount' => ['nullable', 'numeric'],

@@ -55,10 +55,6 @@ class VaultAssignService
 
         $user = $this->userService->findById($userId);
 
-        // $existing = VaultAssign::where('user_id', $userId)
-        //     ->where('vault_id', $vaultId)
-        //     ->first();
-
         if ($existing) {
             // Toggle status
             $newStatus = $existing->status === 'active' ? 'inactive' : 'active';
@@ -73,8 +69,6 @@ class VaultAssignService
                 "User {$user->name} ({$user->email}) assign {$newStatus} to this vault {$vaultId} ",
                 []
             );
-
-
 
             return response()->json([
                 'message' => $newStatus === 'active'

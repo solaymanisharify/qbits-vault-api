@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\DB;
 
 class VaultService
 {
-    public function __construct(protected VaultRepository $repository, protected VaultBagService $vaultBagService, protected VaultAuditConfigService $vaultAuditConfigService, protected LogService $logService) {}
+    public function __construct(protected VaultRepository $vaultReporsitory, protected VaultBagService $vaultBagService, protected VaultAuditConfigService $vaultAuditConfigService, protected LogService $logService) {}
 
     public function getAll(array $filters = [])
     {
         $perPage = min((int) ($filters['per_page'] ?? 15), 100);
 
-        return $this->repository->index($filters, $perPage);
+        return $this->vaultReporsitory->index($filters, $perPage);
     }
 
     public function store($data)
@@ -24,7 +24,7 @@ class VaultService
         DB::beginTransaction();
 
         try {
-            $vault = $this->repository->store($data);
+            $vault = $this->vaultReporsitory->store($data);
 
             $this->logService->activityLog('created', 'vault', "New Vault #{$vault->name} ($vault->vault_code)");
 
@@ -35,7 +35,7 @@ class VaultService
                 $data["vault_id"] = $vault->id;
                 $data["barcode"] = $bag["barcode"];
                 $data["bag_identifier_barcode"] = $bag["bag_identifier_barcode"];
-                $data["rack_number"] = rand(1, 3);
+                $data["rack_number"] = $bag["rack_number"];
                 $data["current_amount"] = $bag["current_amount"];
 
                 $newBag = $this->vaultBagService->store($data);
@@ -50,11 +50,16 @@ class VaultService
 
             // Update the vault with the calculated balance
             $data["balance"] = $vaultBalance;
-            $this->repository->update($vault->id, $data);
+            $this->vaultReporsitory->update($vault->id, $data);
 
             // Create the vault audit configuration
             $vaultAuditConfig["vault_id"] = $vault->id;
-            $this->vaultAuditConfigService->create($vaultAuditConfig);
+            $vaultConfig = $this->vaultAuditConfigService->create($vaultAuditConfig);
+
+            $this->logService->activityLog('created', 'vault config', "New vault config created for ($vault->name)", [
+                $vaultConfig->vault_id,
+                ['vault_id' => $vaultConfig->vault_id, 'status' => $vaultConfig->status]
+            ]);
 
             DB::commit();
 
@@ -69,24 +74,24 @@ class VaultService
 
     public function show(int $id)
     {
-        $vault = $this->repository->show($id);
+        $vault = $this->vaultReporsitory->show($id);
 
         return successResponse("Successfully fetch vault", $vault, 200);
     }
 
     public function find(int $id)
     {
-        return $this->repository->find($id);
+        return $this->vaultReporsitory->find($id);
     }
 
     public function edit(int $id): Vault
     {
-        return $this->repository->edit($id);
+        return $this->vaultReporsitory->edit($id);
     }
 
     public function update(int $id, array $data)
     {
-        return $this->repository->update($id, $data);
+        return $this->vaultReporsitory->update($id, $data);
     }
 
     public function delete(int $id)
@@ -105,8 +110,7 @@ class VaultService
             return errorResponse('Vault cannot be deleted. Please cash out all bags before deleting.', [], 400);
         }
 
-        $vault = $this->repository->destroy($id);
+        $vault = $this->vaultReporsitory->destroy($id);
         return successResponse('Vault deleted successfully.', $vault, 200);
     }
 }
-

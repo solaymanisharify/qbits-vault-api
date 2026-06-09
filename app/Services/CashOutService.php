@@ -8,13 +8,12 @@ use App\Repositories\CashOutBagRepository;
 use App\Repositories\CashOutRepository;
 use App\Repositories\CashOutRequiredRepository;
 use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Role;
 use Illuminate\Support\Str;
 
 class CashOutService
 {
 
-    public function __construct(protected CashOutRepository $cashOutRepo, protected CashOutBagRepository $cashOutBagRepo, protected UserService $userService, protected CashOutRequiredRepository $cashOutRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService) {}
+    public function __construct(protected CashOutRepository $cashOutRepo, protected CashOutBagRepository $cashOutBagRepo, protected UserService $userService, protected CashOutRequiredRepository $cashOutRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService, protected LogService $logService) {}
 
     public function getAll()
     {
@@ -95,6 +94,15 @@ class CashOutService
 
             $cashOutId = $cashOut->id;
 
+
+            $this->logService->activityLog(
+                'create',
+                'cashOut',
+                "Cash-out #{$cashOut->tran_id} requested",
+                []
+            );
+
+
             if (!empty($data["custodian_id"])) {
                 CustodianCashHistory::create([
                     'custodian_id' => $data["custodian_id"],
@@ -102,6 +110,13 @@ class CashOutService
                     'cash_out_id' => $cashOutId,
                     'amount' => $data["cash_out_amount"] - $data["request_amount"],
                 ]);
+
+                $this->logService->activityLog(
+                    'create',
+                    'cashOut',
+                    "Custodian #{$data["custodian_id"]} is added for Cash-out #{$cashOut->tran_id}",
+                    []
+                );
             }
 
 
@@ -124,6 +139,13 @@ class CashOutService
                     'cash_out_id' => $cashOutId,
                     'user_id'    => $verifier,
                 ]);
+
+                $this->logService->activityLog(
+                    'create',
+                    'cashOut',
+                    "Verifier #{$verifier} is assigned for Cash-out #{$cashOut->tran_id}",
+                    []
+                );
             }
 
             // Create approver records
@@ -132,6 +154,13 @@ class CashOutService
                     'cash_out_id' => $cashOutId,
                     'user_id'    => $approver,
                 ]);
+
+                $this->logService->activityLog(
+                    'create',
+                    'cashOut',
+                    "Approver #{$approver} is assigned for Cash-out #{$cashOut->tran_id}",
+                    []
+                );
             }
 
             return successResponse("Successfully created cash-in", [], 200);
@@ -210,6 +239,13 @@ class CashOutService
             'approved' => true,
             'approved_at' => now(),
         ]);
+
+        $this->logService->activityLog(
+            'approved',
+            'cashOut',
+            "Cash-out #{$cashOut->tran_id} approved",
+            []
+        );
 
         // Check if ALL required verifiers have verified
         $totalRequired = $cashOut->requiredApprovers()->count();
@@ -301,6 +337,13 @@ class CashOutService
             'verified_at' => now(),
         ]);
 
+        $this->logService->activityLog(
+            'verified',
+            'cashOut',
+            "Cash-out #{$cashOut->tran_id} verified",
+            []
+        );
+
         // Check if ALL required verifiers have verified
         $totalRequired = $cashOut->requiredVerifiers()->count();
         $totalVerified = $cashOut->requiredVerifiers()->where('verified', true)->count();
@@ -331,6 +374,15 @@ class CashOutService
 
 
         $cashOut->delete();
+
+
+        $this->logService->activityLog(
+            'deleted',
+            'cashOut',
+            "Cash-out #{$cashOut->tran_id} deleted",
+            []
+        );
+
 
         return successResponse("Cash-out deleted successfully", [], 200);
     }

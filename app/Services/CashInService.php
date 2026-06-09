@@ -8,14 +8,13 @@ use App\Models\VaultBag;
 use App\Repositories\CashInRepository;
 use App\Repositories\CashInRequiredRepository;
 use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Role;
 use Illuminate\Support\Str;
 
 
 class CashInService
 {
 
-    public function __construct(protected CashInRepository $cashInRepo, protected UserService $userService, protected CashInRequiredRepository $cashInRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService) {}
+    public function __construct(protected CashInRepository $cashInRepo, protected UserService $userService, protected CashInRequiredRepository $cashInRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService, protected LogService $logService, protected VaultService $vaultService) {}
 
     public function getAll()
     {
@@ -28,9 +27,177 @@ class CashInService
         return $this->cashInRepo->find($id);
     }
 
+    // public function createCashIn(array $data)
+    // {
+
+    //     $orderIds = collect($data['orders'])->pluck('order_id');
+
+    //     $existingOrders = CashIn::where(function ($query) use ($orderIds) {
+    //         foreach ($orderIds as $orderId) {
+    //             $query->orWhereJsonContains('orders', ['order_id' => $orderId]);
+    //         }
+    //     })->pluck('orders');
+
+    //     $duplicates = $existingOrders
+    //         ->flatten(1)
+    //         ->pluck('order_id')
+    //         ->intersect($orderIds)
+    //         ->values();
+
+    //     if ($duplicates->isNotEmpty()) {
+    //         return errorResponse(
+    //             ['message' => 'Orders ' . $duplicates->implode(', ') . ' are already linked to a cash-in'],
+    //             [],
+    //             500
+    //         );
+    //     }
+
+
+    //     $data["user_id"] = auth()->id();
+    //     $data["verifier_status"] = "pending";
+    //     $data["status"] = "pending";
+    //     $vaultId = $data['vault_id'];
+
+    //     $authUserId = auth()->user();
+
+    //     // $data["vault_id"] = $vaultId;
+    //     $cashInAmount = $data['cash_in_amount'];
+
+    //     $bagAmountLimit = 200000;
+
+    //     $roles = $this->roleService->getRoleByRoles(['verifier', 'approver']);
+
+
+    //     $verifierRole = $roles->get('verifier');
+    //     $approverRole = $roles->get('approver');
+
+    //     if (!$verifierRole || !$approverRole) {
+    //         $message = match (true) {
+    //             !$verifierRole && !$approverRole => 'Verifier and approver roles not found',
+    //             !$verifierRole                   => 'Verifier role not found',
+    //             !$approverRole                   => 'Approver role not found',
+    //         };
+
+    //         return errorResponse(['message' => $message], [
+    //             'verifier_role' => (bool) $verifierRole,
+    //             'approver_role' => (bool) $approverRole,
+    //             'role_status' => false,
+    //         ], 500);
+    //     }
+
+    //     if ($vaultId) {
+
+    //         $assignments = VaultAssign::where('vault_id', $vaultId)
+    //             ->where('status', 'active')
+    //             ->get(['user_id', 'roles']);
+
+
+    //         $verifierUserIds = $assignments
+    //             ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
+    //             ->pluck('user_id');
+
+    //         $approverUserIds = $assignments
+    //             ->filter(fn($a) => in_array($approverRole->id, $a->roles ?? []))
+    //             ->pluck('user_id');
+
+
+    //         if ($verifierUserIds->isEmpty() || $approverUserIds->isEmpty()) {
+    //             $message = match (true) {
+    //                 $verifierUserIds->isEmpty() && $approverUserIds->isEmpty() => 'Verifier and approver not found for this vault',
+    //                 $verifierUserIds->isEmpty()                                => 'Verifier not found for this vault',
+    //                 $approverUserIds->isEmpty()                                => 'Approver not found for this vault',
+    //             };
+
+    //             return errorResponse(['message' => $message], [
+    //                 'verifier_found' => !$verifierUserIds->isEmpty(),
+    //                 'approver_found' => !$approverUserIds->isEmpty(),
+    //                 'role_status'    => false,
+    //             ], 500);
+    //         }
+    //     }
+
+    //     $role = $authUserId->roles->contains(function ($role) {
+    //         return strtolower($role->name) === 'bag create';
+    //     });
+
+    //     // calculation which bag is suitable for the cash-in amount
+    //     $bag = VaultBag::where('vault_id', $vaultId)
+    //         ->where('is_active', true)
+    //         ->where('current_amount', 0)
+    //         ->first();
+
+    //     if ($bag) {
+    //         $existPendingInCashIn = CashIn::where('bag_id', $bag->id)
+    //             ->whereNull('completed_at')
+    //             ->exists();
+
+    //         // 3. If both conditions are met, return the error
+    //         if ($existPendingInCashIn) {
+    //             return errorResponse(
+    //                 [
+    //                     'message' => 'No bag available for cash-in',
+    //                     'bag_create_role' => $role,
+    //                     'vault_id' => $vaultId,
+    //                 ],
+    //                 [],
+    //                 500
+    //             );
+    //         }
+    //     }
+
+    //     if (!$bag) {
+
+    //         return errorResponse(
+    //             [
+    //                 'message' => 'No bag available for cash-in',
+    //                 'bag_create_role' => $role,
+    //                 'vault_id' => $vaultId,
+    //             ],
+    //             [],
+    //             500
+    //         );
+    //     }
+
+    //     $data['bag_id'] = $bag->id;
+
+
+    //     return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds) {
+    //         $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
+
+    //         $cashIn = $this->cashInRepo->create($data);
+
+    //         info($cashIn);
+
+    //         $this->logService->activityLog(
+    //             'created',
+    //             'cashIn',
+    //             "New Cash-in #{$cashIn->tran_id} requested into vault {$cashIn->vault->name} where bag #{$cashIn->bag->barcode}",
+    //             []
+    //         );
+
+
+    //         // Create verifier records
+    //         foreach ($verifierUserIds as $verifier) {
+    //             $this->cashInRequired->create([
+    //                 'cash_in_id' => $cashIn->id,
+    //                 'user_id'    => $verifier,
+    //             ]);
+    //         }
+
+    //         // Create approver records
+    //         foreach ($approverUserIds as $approver) {
+    //             $this->cashInRequired->createApprover([
+    //                 'cash_in_id' => $cashIn->id,
+    //                 'user_id'    => $approver,
+    //             ]);
+    //         }
+
+    //         return successResponse("Successfully created cash-in", $cashIn, 200);
+    //     });
+    // }
+
     public function createCashIn(array $data)
     {
-
         $orderIds = collect($data['orders'])->pluck('order_id');
 
         $existingOrders = CashIn::where(function ($query) use ($orderIds) {
@@ -53,7 +220,6 @@ class CashInService
             );
         }
 
-
         $data["user_id"] = auth()->id();
         $data["verifier_status"] = "pending";
         $data["status"] = "pending";
@@ -61,13 +227,7 @@ class CashInService
 
         $authUserId = auth()->user();
 
-        // $data["vault_id"] = $vaultId;
-        $cashInAmount = $data['cash_in_amount'];
-
-        $bagAmountLimit = 200000;
-
         $roles = $this->roleService->getRoleByRoles(['verifier', 'approver']);
-
 
         $verifierRole = $roles->get('verifier');
         $approverRole = $roles->get('approver');
@@ -86,12 +246,18 @@ class CashInService
             ], 500);
         }
 
+        // Fetch Vault Name explicitly before hand to guarantee it's available for logging context
+        $vaultName = "Unknown Vault";
         if ($vaultId) {
+            $vaultInstance = $this->vaultService->find($vaultId);
+
+            if ($vaultInstance) {
+                $vaultName = $vaultInstance->name;
+            }
 
             $assignments = VaultAssign::where('vault_id', $vaultId)
                 ->where('status', 'active')
                 ->get(['user_id', 'roles']);
-
 
             $verifierUserIds = $assignments
                 ->filter(fn($a) => in_array($verifierRole->id, $a->roles ?? []))
@@ -100,7 +266,6 @@ class CashInService
             $approverUserIds = $assignments
                 ->filter(fn($a) => in_array($approverRole->id, $a->roles ?? []))
                 ->pluck('user_id');
-
 
             if ($verifierUserIds->isEmpty() || $approverUserIds->isEmpty()) {
                 $message = match (true) {
@@ -121,7 +286,7 @@ class CashInService
             return strtolower($role->name) === 'bag create';
         });
 
-        // calculation which bag is suitable for the cash-in amount
+        // Calculation which bag is suitable for the cash-in amount
         $bag = VaultBag::where('vault_id', $vaultId)
             ->where('is_active', true)
             ->where('current_amount', 0)
@@ -132,7 +297,6 @@ class CashInService
                 ->whereNull('completed_at')
                 ->exists();
 
-            // 3. If both conditions are met, return the error
             if ($existPendingInCashIn) {
                 return errorResponse(
                     [
@@ -147,7 +311,6 @@ class CashInService
         }
 
         if (!$bag) {
-
             return errorResponse(
                 [
                     'message' => 'No bag available for cash-in',
@@ -161,11 +324,20 @@ class CashInService
 
         $data['bag_id'] = $bag->id;
 
-
-        return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds) {
+        // Pass variables safely using `use` block closures
+        return DB::transaction(function () use ($data, $verifierUserIds, $approverUserIds, $vaultName, $bag) {
             $data["tran_id"] = strtoupper(substr(Str::ulid(), 0, 16));
 
             $cashIn = $this->cashInRepo->create($data);
+
+            info($cashIn);
+
+            $this->logService->activityLog(
+                'created',
+                'cashIn',
+                "New Cash-in #{$cashIn->tran_id} requested into vault {$vaultName} where bag #{$bag->barcode}",
+                []
+            );
 
             // Create verifier records
             foreach ($verifierUserIds as $verifier) {
@@ -173,6 +345,13 @@ class CashInService
                     'cash_in_id' => $cashIn->id,
                     'user_id'    => $verifier,
                 ]);
+
+                $this->logService->activityLog(
+                    'created',
+                    'cashIn',
+                    "for Cash-in #{$cashIn->tran_id} assigned verifier {$verifier}",
+                    []
+                );
             }
 
             // Create approver records
@@ -181,11 +360,19 @@ class CashInService
                     'cash_in_id' => $cashIn->id,
                     'user_id'    => $approver,
                 ]);
+
+                $this->logService->activityLog(
+                    'created',
+                    'cashIn',
+                    "for Cash-in #{$cashIn->tran_id} assigned approver {$approver}",
+                    []
+                );
             }
 
             return successResponse("Successfully created cash-in", $cashIn, 200);
         });
     }
+
 
     public function updateCashIn($data, $id)
     {
@@ -249,6 +436,13 @@ class CashInService
                 'orders'         => $updatedOrders,
             ]);
 
+            $this->logService->activityLog(
+                'update',
+                'cashIn',
+                "Cash-in #{$cashIn->tran_id} updated",
+                []
+            );
+
             return successResponse("Successfully updated cash-in", $cashIn->fresh(), 200);
         });
     }
@@ -268,6 +462,13 @@ class CashInService
 
 
         $cashIn->delete();
+
+        $this->logService->activityLog(
+            'deleted',
+            'cashIn',
+            "Cash-in #{$cashIn->tran_id} deleted",
+            []
+        );
 
         return successResponse("Cash-in deleted successfully", [], 200);
     }
@@ -328,13 +529,6 @@ class CashInService
             return errorResponse('You do not have permission to approve', [], 403);
         }
 
-        // $request->validate([
-        //     'action' => 'required|in:verify,approve,reject',
-        //     'note' => 'nullable|string|max:500',
-        // ]);
-
-        // $action = $request["action"];
-
         // Check if this user is a required verifier for this CashIn
         $requiredApprover = $cashIn->requiredApprovers()
             ->where('user_id', $user->id)
@@ -353,6 +547,13 @@ class CashInService
             'approved' => true,
             'approved_at' => now(),
         ]);
+
+        $this->logService->activityLog(
+            'approved',
+            'cashIn',
+            "Cash-in #{$cashIn->tran_id} approved",
+            []
+        );
 
         // Check if ALL required verifiers have verified
         $totalRequired = $cashIn->requiredApprovers()->count();
@@ -460,6 +661,14 @@ class CashInService
             'verified' => true,
             'verified_at' => now(),
         ]);
+
+
+        $this->logService->activityLog(
+            'verified',
+            'cashIn',
+            "Cash-in #{$cashIn->tran_id} verified",
+            []
+        );
 
         // Check if ALL required verifiers have verified
         $totalRequired = $cashIn->requiredVerifiers()->count();

@@ -57,4 +57,8 @@ class VaultBagRepository
     {
         return VaultBag::find($id);
     }
+    public function getVaultBagByVaultid($vaultId)
+    {
+        return VaultBag::where('vault_id', $vaultId)->get();
+    }
 }

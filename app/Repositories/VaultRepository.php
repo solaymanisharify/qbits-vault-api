@@ -107,62 +107,6 @@ class VaultRepository
         return Vault::findOrFail($id);
     }
 
-    /**
-     * Update an existing vault.
-     */
-    // public function update(int $id, array $data): bool
-    // {
-    //     $vault = Vault::findOrFail($id);
-
-    //     // Separate bags from vault fields
-    //     $bags    = $data['bags'] ?? [];
-    //     $vaultData = collect($data)->except(['bags'])->toArray();
-
-    //     // Update vault core fields
-    //     $updated = $vault->update($vaultData);
-
-    //     // Handle bags — update existing, create new
-    //     if (!empty($bags)) {
-    //         foreach ($bags as $bagData) {
-    //             $existingBag = VaultBag::where('vault_id', $vault->id)
-    //                 ->where('barcode', $bagData['barcode'])
-    //                 ->first();
-
-    //             if ($existingBag) {
-    //                 // Update existing bag
-    //                 $existingBag->update([
-    //                     'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? $existingBag->bag_identifier_barcode,
-    //                     'rack_number'            => $bagData['rack_number'] ?? $existingBag->rack_number,
-    //                     'current_amount'         => $bagData['current_amount'] ?? $existingBag->current_amount,
-    //                 ]);
-    //             } else {
-    //                 // Create new bag
-    //                 VaultBag::create([
-    //                     'vault_id'               => $vault->id,
-    //                     'barcode'                => $bagData['barcode'],
-    //                     'bag_identifier_barcode' => $bagData['bag_identifier_barcode'] ?? null,
-    //                     'rack_number'            => $bagData['rack_number'] ?? null,
-    //                     'current_amount'         => $bagData['current_amount'] ?? 0,
-    //                     'is_active'              => true,
-    //                     'is_sealed'              => false,
-    //                 ]);
-    //             }
-    //         }
-
-    //         // Recalculate vault totals from all its bags
-    //         $vault->refresh();
-    //         $totalAmount = $vault->bags()->sum('current_amount');
-    //         $totalBags   = $vault->bags()->count();
-
-    //         $vault->update([
-    //             'balance'    => $totalAmount,
-    //             'total_bags' => $totalBags,
-    //         ]);
-    //     }
-
-    //     return $updated;
-    // }
-
     public function update(int $id, array $data): array
     {
         $vault    = Vault::findOrFail($id);
@@ -182,7 +126,7 @@ class VaultRepository
             $incomingBarcodes = collect($incomingBags)->pluck('barcode')->toArray();
 
             // ── 3. Find bags that exist in DB but are missing in payload ──────
-            $existingBags = VaultBag::where('vault_id', $vault->id)->get();
+            $existingBags = $this->vaultBagService->getVaultBagByVaultid($vault->id);
 
             foreach ($existingBags as $existingBag) {
                 if (!in_array($existingBag->barcode, $incomingBarcodes)) {
@@ -195,11 +139,6 @@ class VaultRepository
                         continue;
                     }
 
-                    // Safe to soft-delete
-                    $existingBag->appendHistory('deleted', "Bag removed from vault during vault update", [
-                        'vault_id'   => $vault->id,
-                        'vault_name' => $vault->name,
-                    ]);
 
                     $existingBag->update(['is_active' => false, 'deleted_reason' => 'Removed during vault update']);
                     $existingBag->delete(); // soft delete
@@ -303,17 +242,21 @@ class VaultRepository
 
         return [
             'success'         => empty($errors),
-            'errors'          => $errors,           // non-deleted bags with amounts
+            'errors'          => $errors,
             'deleted_barcodes' => $deletedBarcodes,
         ];
     }
     /**
      * Delete a vault.
      */
-    public function destroy(int $id): bool
+    public function destroy(int $id)
     {
         $vault = Vault::findOrFail($id);
 
-        return $vault->delete();
+        $vault->delete();
+
+        $this->logService->activityLog('deleted', 'vault', " Vault #{$vault->name} ($vault->vault_code) deleted");
+
+        return successResponse('Vault deleted successfully.', $vault, 200);
     }
 }

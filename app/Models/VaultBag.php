@@ -111,25 +111,4 @@ class VaultBag extends Model
     //     $this->save();
     // }
 
-
-    // public function appendHistory(string $event, string $description, array $data = []): void
-    // {
-    //     $history   = $this->history ?? [];
-    //     $history[] = [
-    //         'event'       => $event,
-    //         'description' => $description,
-    //         'data'        => $data,
-    //         'user_id'     => auth()->id(),
-    //         'user_name'   => auth()->user()?->name ?? 'System',
-    //         'timestamp'   => now()->toIso8601String(),
-    //     ];
-
-    //     // Cap at 200 entries per bag so JSON doesn't bloat
-    //     if (count($history) > 200) {
-    //         $history = array_slice($history, -200);
-    //     }
-
-    //     $this->history = $history;
-    //     $this->saveQuietly(); // skip model events to avoid recursion
-    // }
 }
