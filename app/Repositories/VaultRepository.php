@@ -122,7 +122,7 @@ class VaultRepository
         $deletedBarcodes = [];
         $errors          = [];
 
-        if (!empty($incomingBags)) {
+        if (array_key_exists('bags', $data)) {
             $incomingBarcodes = collect($incomingBags)->pluck('barcode')->toArray();
 
             // ── 3. Find bags that exist in DB but are missing in payload ──────
