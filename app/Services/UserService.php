@@ -218,6 +218,21 @@ class UserService
     public function notVerifiedUserEmailVerification($user)
     {
 
+
+        $latestOtp = $this->otpService->getLatestOtpByUserId($user->id, 'email_verification');
+
+        if ($latestOtp) {
+            $secondsSinceLastOtp = now()->diffInSeconds($latestOtp->created_at);
+            $lockWindow = 240;
+
+            if ($secondsSinceLastOtp < $lockWindow) {
+                $secondsLeft = $lockWindow - $secondsSinceLastOtp;
+
+                return errorResponse("Please wait before requesting a new code.", ['seconds_left' => $secondsLeft], 429);
+            }
+        }
+
+
         $this->otpService->deleteUnusedOtpByUserId($user->id, 'email_verification');
 
         $otp = rand(100000, 999999); // 6 digit OTP
@@ -229,8 +244,6 @@ class UserService
                 'message' => new TemplateMessage([
                     'to' => [
                         Recipient::email($user->email),
-                        // Recipient::phone('+8801700000000'),
-                        // Recipient::userId('user_123'),
                     ],
                     'template' => 'vault_email_verify',
                     'data'     => ['otp' => $otp],

@@ -29,6 +29,7 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/user/verification', 'userVerifcation');
     Route::post('/forget-password', [UserController::class, 'forgetPassword']);
     Route::post('/reset-password/confirm', [UserController::class, 'confirmResetPassword']);
+    Route::post('/resend/email/verification/otp', [UserController::class, 'resendEmailVerificationOtp']);
 });
 
 Route::middleware(['auth:api', 'check.active'])->group(function () {

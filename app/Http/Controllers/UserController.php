@@ -370,4 +370,10 @@ class UserController extends Controller
     {
         return $this->userService->getVaultCustodians($vaultId);
     }
+    public function resendEmailVerificationOtp()
+    {
+        $user = Auth::user();
+
+        return  $this->userService->notVerifiedUserEmailVerification($user);
+    }
 }

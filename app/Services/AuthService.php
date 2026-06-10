@@ -40,13 +40,13 @@ class AuthService
         ]);
 
         $credentials = $request->only('email', 'password');
-        $user = \App\Models\User::where('email', $request->email)->first();
+        // $user = \App\Models\User::where('email', $request->email)->first();
 
-        if ($user) {
-            // Check if the password actually matches the database hash manually
-            $check = \Illuminate\Support\Facades\Hash::check($request->password, $user->password);
-            info('Manual hash match check: ' . ($check ? 'TRUE' : 'FALSE'));
-        }
+        // if ($user) {
+        //     // Check if the password actually matches the database hash manually
+        //     $check = \Illuminate\Support\Facades\Hash::check($request->password, $user->password);
+        //     info('Manual hash match check: ' . ($check ? 'TRUE' : 'FALSE'));
+        // }
 
         $token = Auth::attempt($credentials);
         if (!$token) {

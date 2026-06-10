@@ -3,17 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Otp;
-use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\AuthService;
+use App\Services\LogService;
 use App\Services\UserService;
 use App\Services\UserVerificationService;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
-use Pippa\NotificationSdkLaravel\DTOs\Recipient;
-use Pippa\NotificationSdkLaravel\DTOs\TemplateMessage;
-use Pippa\NotificationSdkLaravel\Facades\NotificationService;
-use Pippa\NotificationSdkLaravel\Requests\SendMessageRequest;
+
 
 class AuthController extends Controller
 {
@@ -21,6 +18,7 @@ class AuthController extends Controller
         protected AuthService $authService,
         protected UserService $userService,
         protected UserVerificationService $userVerificationService,
+        protected LogService $logService
     ) {}
     public function register(Request $request)
     {
@@ -99,83 +97,6 @@ class AuthController extends Controller
         return response()->json(['message' => 'Email verified successfully']);
     }
 
-    // public function verifyPhoneOtp(Request $request)
-    // {
-    //     $request->validate([
-    //         'otp'   => ['required', 'digits:6'],
-    //         'phone' => ['required', 'string', 'regex:/^\+?[0-9]{7,15}$/'],
-    //     ]);
-
-    //     $user = auth()->user();
-
-    //     // Idempotency guard — already verified, no need to proceed
-    //     if ($user->phone_verified_at && $user->phone === $request->phone) {
-    //         return response()->json([
-    //             'message' => 'Phone is already verified.',
-    //         ], 200);
-    //     }
-
-    //     // Brute-force guard — max 5 failed attempts per 10 minutes
-    //     $throttleKey = 'otp_verify:' . $user->id;
-
-    //     if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-    //         $seconds = RateLimiter::availableIn($throttleKey);
-
-    //         return response()->json([
-    //             'message' => "Too many attempts. Please try again in {$seconds} seconds.",
-    //         ], 429);
-    //     }
-
-    //     // Fetch latest unused, unexpired OTP for this user + purpose
-    //     $otpRecord = Otp::where('user_id', $user->id)
-    //         ->where('purpose', 'phone_verification')
-    //         // ->whereNull('verified_at')
-    //         // ->whereNull('used_at')
-    //         ->where('expires_at', '>', now())
-    //         ->latest()
-    //         ->first();
-
-    //     // Validate existence and hash match
-    //     if (!$otpRecord || !password_verify($request->otp, $otpRecord->otp)) {
-    //         RateLimiter::hit($throttleKey, 600); // count failed attempt (10 min window)
-
-    //         return response()->json([
-    //             'message' => 'Invalid or expired OTP.',
-    //         ], 422);
-    //     }
-
-    //     // OTP is valid — clear rate limiter
-    //     RateLimiter::clear($throttleKey);
-
-    //     // Mark OTP as consumed (both fields for clarity)
-    //     $otpRecord->update([
-    //         'used'     => true,
-    //         // 'verified_at' => now(),
-    //     ]);
-
-    //     // Invalidate all other pending OTPs for same purpose (clean slate)
-    //     Otp::where('user_id', $user->id)
-    //         ->where('purpose', 'phone_verification')
-    //         ->where('id', '!=', $otpRecord->id)
-    //         // ->whereNull('used_at')
-    //         ->delete();
-
-    //     // Save phone + mark as verified
-    //     $user->update([
-    //         'phone'             => $request->phone,
-    //         'phone_verified_at' => now(),
-    //         'verified'          => true,
-    //     ]);
-
-    //     return response()->json([
-    //         'message' => 'Phone verified successfully.',
-    //         'data'    => [
-    //             'phone'             => $user->phone,
-    //             'phone_verified_at' => $user->phone_verified_at,
-    //         ],
-    //     ], 200);
-    // }
-
     public function verifyPhoneOtp(Request $request)
     {
         $request->validate([
@@ -187,9 +108,8 @@ class AuthController extends Controller
 
         // Idempotency guard — already verified with same phone
         if ($user->phone_verified_at) {
-            return response()->json([
-                'message' => 'Phone is already verified.',
-            ], 200);
+
+            return errorResponse("Phone is already verified.", [], 409);
         }
 
         // Brute-force guard — max 5 failed attempts per 10 minutes
@@ -198,16 +118,12 @@ class AuthController extends Controller
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
 
-            return response()->json([
-                'message' => "Too many attempts. Try again in {$seconds} seconds.",
-            ], 429);
+            return errorResponse("Too many attempts. Try again in {$seconds} seconds.", [], 429);
         }
 
         // Fetch latest valid OTP record for this user + purpose
         $otpRecord = Otp::where('user_id', $user->id)
             ->where('purpose', 'phone_verification')
-            // ->whereNull('verified_at')
-            // ->whereNull('used_at')
             ->where('expires_at', '>', now())
             ->latest()
             ->first();
@@ -216,9 +132,7 @@ class AuthController extends Controller
         if (!$otpRecord || !password_verify($request->otp, $otpRecord->otp)) {
             RateLimiter::hit($throttleKey, 600); // count failed attempt
 
-            return response()->json([
-                'message' => 'Invalid or expired OTP.',
-            ], 422);
+            return errorResponse("Invalid or expired OTP.", [], 422);
         }
 
         // OTP matched — clear brute-force counter
@@ -244,13 +158,14 @@ class AuthController extends Controller
             'verified'          => true, // boolean, NOT string 'true'
         ]);
 
-        return response()->json([
-            'message' => 'Phone verified successfully.',
-            'data'    => [
-                'phone'             => $user->fresh()->phone,
-                'phone_verified_at' => $user->fresh()->phone_verified_at,
-            ],
-        ], 200);
+        $data = [
+            'phone'             => $user->fresh()->phone,
+            'phone_verified_at' => $user->fresh()->phone_verified_at,
+        ];
+
+        $this->logService->activityLog("phone_verification", "auth", "User #{$user->name} Phone verified successfully.");
+
+        return successResponse("Phone verified successfully.", $data, 200);
     }
 
     // public function sendOtpToPhone(Request $request)

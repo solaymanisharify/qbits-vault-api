@@ -12,6 +12,10 @@ class OtpService
     {
         $this->otpRepository->create($userId, $otp, $purpose);
     }
+    public function getLatestOtpByUserId($userId, $purpose)
+    {
+        $this->otpRepository->getLatestOtpByUserId($userId, $purpose);
+    }
     public function deleteUnusedOtpByUserId($userId, $purpose)
     {
         $this->otpRepository->deleteUnusedOtpByUserId($userId, $purpose);
