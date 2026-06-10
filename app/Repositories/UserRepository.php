@@ -228,9 +228,6 @@ class UserRepository
 
             $requestedPermissionIds = $data['permissions'];
 
-            DB::table('user_permission_overrides')
-                ->where('user_id', $user->id)
-                ->delete();
 
             $allPermissions = Permission::all();
 
@@ -239,21 +236,8 @@ class UserRepository
                 $isRequested = in_array($permission->id, $requestedPermissionIds);
 
                 if ($isInRole && !$isRequested) {
-                    DB::table('user_permission_overrides')->insert([
-                        'user_id'      => $user->id,
-                        'permission_id' => $permission->id,
-                        'granted'      => false,
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]);
+                   
                 } elseif (!$isInRole && $isRequested) {
-                    DB::table('user_permission_overrides')->insert([
-                        'user_id'      => $user->id,
-                        'permission_id' => $permission->id,
-                        'granted'      => true,
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]);
                 }
             }
         }

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 class ReconcileService
 {
 
-    public function __construct(protected ReconcileRepository $reconcileRepository, protected UserService $userService, protected ReconcileRequiredRepository $reconcileRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService, protected VaultAssignService $vaultAssignService) {}
+    public function __construct(protected ReconcileRepository $reconcileRepository, protected UserService $userService, protected ReconcileRequiredRepository $reconcileRequired, protected VaultBagService $vaultBagService, protected RoleService $roleService, protected VaultAssignService $vaultAssignService, protected LogService $logService) {}
 
     public function index($request)
     {
@@ -84,6 +84,13 @@ class ReconcileService
 
             $reconcile = $this->reconcileRepository->createReconcile($data);
 
+            $this->logService->activityLog(
+                'created',
+                'reconciliation',
+                "Reconciliation #$reconcile->reconcile_tran_id has been created",
+                []
+            );
+
             $assignments = $this->vaultAssignService->findActiveVaultAssignUserByVaultId($vaultId);
 
             $verifierUserIds = $assignments
@@ -109,7 +116,6 @@ class ReconcileService
                 throw new \Exception($message);
             }
 
-            info($verifierUserIds);
             foreach ($verifierUserIds as $verifier) {
                 $this->reconcileRequired->createVerifier([
                     'reconcile_id' => $reconcile->id,
@@ -206,6 +212,13 @@ class ReconcileService
             'verified_at' => now(),
         ]);
 
+        $this->logService->activityLog(
+            'verified',
+            'reconciliation',
+            "Reconciliation #$reconcile->reconcile_tran_id has been verified",
+            []
+        );
+
         // Check if ALL required verifiers have verified
         $totalRequired = $reconcile->requiredVerifiers()->count();
         $totalVerified = $reconcile->requiredVerifiers()->where('verified', true)->count();
@@ -231,10 +244,6 @@ class ReconcileService
 
         $expected_balance = $reconcile->vault->bags()->sum('current_amount');
 
-
-
-        // $vault =  $reconcile->vault();
-
         if ($reconcile->status !== 'pending' || $reconcile->is_locked) {
             return response()->json(['error' => 'Cannot start reconciliation'], 400);
         }
@@ -246,6 +255,13 @@ class ReconcileService
         $reconcile->started_by = auth()->user()->id;
         $reconcile->locked_until = now()->addHours(6);
         $reconcile->save();
+
+        $this->logService->activityLog(
+            'updated',
+            'reconciliation',
+            "Reconciliation #$reconcile->reconcile_tran_id Start Counting",
+            []
+        );
 
         return successResponse("Successfully started reconcile", $reconcile, 200);
     }
@@ -278,7 +294,7 @@ class ReconcileService
             $bag = $this->vaultBagService->getBagByBagId($item['bag_id']);
 
             if (!$bag) {
-                continue; // or throw/log error
+                continue;
             }
 
             $expected_balance += $bag->current_amount ?? 0;
@@ -290,18 +306,8 @@ class ReconcileService
                 'difference'            => $item['difference'] ?? 0,
                 'note'                  => $item['note'] ?? null,
                 'counted_amount'        => $item['counted_amount'] ?? 0,
-                // 'counted_denominations' => json_encode($item['counted_denominations'] ?? []),
                 'expected_amount'       => $bag->current_amount ?? 0,
             ]);
-
-            // if ($item['difference'] < 0) {
-            //     $bag->current_amount -= $item['difference'];
-            //     $bag->save();
-            // }
-            // if ($item['difference'] > 0) {
-            //     $bag->current_amount += $item['difference'];
-            //     $bag->save();
-            // }
         }
         $reconcile->finished_bag_count += count($data['variances_bags'] ?? []);
         $reconcile->counted_balance  += $counted_balance;
@@ -319,5 +325,12 @@ class ReconcileService
         $reconcile->is_locked = false;
         $reconcile->locked_until = null;
         $reconcile->save();
+
+        $this->logService->activityLog(
+            'updated',
+            'reconciliation',
+            "Reconciliation #$reconcile->reconcile_tran_id has been completed",
+            []
+        );
     }
 }

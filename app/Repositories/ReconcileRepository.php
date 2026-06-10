@@ -16,7 +16,6 @@ class ReconcileRepository
 
         $query->with([
             'requiredVerifiers.user:id,name,email',
-            'requiredApprovers.user:id,name,email',
             'startedBy:id,name,email',
             'completedBy',
             'varianceBags:id,vault_id,barcode,rack_number',
@@ -111,7 +110,7 @@ class ReconcileRepository
                 $query->where('user_id', $userId)
                     ->where('verified', false);
             })
-            ->with(['requiredVerifiers', 'requiredApprovers'])
+            ->with(['requiredVerifiers'])
             ->get();
     }
 
@@ -120,7 +119,7 @@ class ReconcileRepository
     {
         return Reconciliation::where('verifier_status', 'verified')
             ->where('status', 'pending')
-            ->with(['requiredVerifiers', 'requiredApprovers'])
+            ->with(['requiredVerifiers'])
             ->get();
     }
 }

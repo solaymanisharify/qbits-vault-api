@@ -60,10 +60,6 @@ class Reconciliation extends Model
         return $this->hasMany(ReconcileRequiredVerifier::class, 'reconcile_id', 'id');
     }
 
-    public function requiredApprovers()
-    {
-        return $this->hasMany(ReconcileRequiredApprover::class, 'reconcile_id', 'id');
-    }
     public function varianceBags()
     {
         return $this->belongsToMany(VaultBag::class, 'reconciliation_bag', 'reconciliation_id', 'bag_id')

@@ -114,12 +114,6 @@ class User extends Authenticatable implements JWTSubject
             ->unique()
             ->toArray();
 
-        // Get overrides for this user
-        $overrides = DB::table('user_permission_overrides')
-            ->where('user_id', $this->id)
-            ->get()
-            ->keyBy('permission_id');
-
         // Start with role permissions
         $effective = $rolePermissionIds;
 
