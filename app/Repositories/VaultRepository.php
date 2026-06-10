@@ -55,7 +55,7 @@ class VaultRepository
             ])
             // Single query for bags — derive count from the loaded collection
             // avoids hitting the bags table twice (withCount + with)
-            ->with(['bags:id,vault_id,barcode,bag_identifier_barcode,rack_number,current_amount,is_active,is_sealed'])
+            ->with(['bags'])
             ->when(!$isSuperAdmin, fn($q) => $q->whereIn('id', $assignedVaultIds))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where(function ($q2) use ($search) {

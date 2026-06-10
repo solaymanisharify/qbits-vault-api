@@ -96,19 +96,5 @@ class VaultBag extends Model
         return $query->where('is_active', true);
     }
 
-    /**
-     * Optional: Append a log entry to history (JSON array)
-     */
-    // public function addHistoryLog(array $log)
-    // {
-    //     $history = $this->history ?? [];
-
-    //     $history[] = array_merge($log, [
-    //         'timestamp' => now()->toDateTimeString(),
-    //     ]);
-
-    //     $this->history = $history;
-    //     $this->save();
-    // }
 
 }
