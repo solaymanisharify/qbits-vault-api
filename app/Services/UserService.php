@@ -2,14 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Repositories\CashInRequiredRepository;
 use App\Repositories\CashOutRequiredRepository;
 use App\Repositories\CustodianRepository;
+use App\Repositories\ReconcileRequiredRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\VaultAssignRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Pippa\NotificationSdkLaravel\DTOs\Recipient;
 use Pippa\NotificationSdkLaravel\DTOs\TemplateMessage;
 use Pippa\NotificationSdkLaravel\Facades\NotificationService;
@@ -26,7 +27,8 @@ class UserService
         protected VaultAssignRepository $vaultAssignRepository,
         protected CashInRequiredRepository $cashInRequiredRepository,
         protected CashOutRequiredRepository $cashOutRequiredRepository,
-        protected CustodianRepository $custodianRepository
+        protected CustodianRepository $custodianRepository,
+        protected ReconcileRequiredRepository $reconcileRequiredRepository
     ) {}
     public function findById($id)
     {
@@ -203,7 +205,6 @@ class UserService
             return errorResponse("Token has expired", [], 422);
         }
 
-        // $user = User::where('email', $request->email)->firstOrFail();
         $user = $this->findByEmail($request->email);
 
         $user->password = Hash::make($request->password);
@@ -219,20 +220,7 @@ class UserService
 
         $this->otpService->deleteUnusedOtpByUserId($user->id, 'email_verification');
 
-        // Optional: Delete old unused OTPs
-        // Otp::where('user_id', $user->id)
-        //     ->where('purpose', 'email_verification')
-        //     ->where('used', false)
-        //     ->delete();
-
         $otp = rand(100000, 999999); // 6 digit OTP
-
-        // Otp::create([
-        //     'user_id'    => $user->id,
-        //     'otp'        => $otp,
-        //     'purpose'    => 'email_verification',
-        //     'expires_at' => now()->addMinutes(15),
-        // ]);
 
         $this->otpService->create($user->id, $otp, 'email_verification');
 
@@ -249,11 +237,6 @@ class UserService
                 ]),
             ])
         );
-
-
-        // handleHttpNewRequest('POST', env('NAAS_SERVICE_BASE_URL') . '/notification/send', [], $data);
-
-        // Mail::to($user->email)->send(new InactiveUserEmailVerification($user));
     }
 
 
@@ -273,35 +256,27 @@ class UserService
 
     public function checkPhoneNumberExistence($phone, $userId)
     {
-        return User::where('phone', $phone)
-            ->where('id', '!=', $userId)
-            ->exists();
+        return $this->userRepository->checkUserPhoneNumberExistenceByUserId($phone, $userId);
     }
 
-    private function getTrackingMatrices()
-    {
-        return [
-            ['table' => 'cash_in_required_approvers',  'column' => 'approved', 'label' => 'Cash In Approval Queue'],
-            ['table' => 'cash_in_required_verifiers',  'column' => 'verified', 'label' => 'Cash In Verification Queue'],
-            ['table' => 'cashout_required_approvers',  'column' => 'approved', 'label' => 'Cash Out Approval Queue'],
-            ['table' => 'cashout_required_verifiers',  'column' => 'verified', 'label' => 'Cash Out Verification Queue'],
-            ['table' => 'reconcile_required_approvers', 'column' => 'approved', 'label' => 'Reconciliation Approval Queue'],
-            ['table' => 'reconcile_required_verifiers', 'column' => 'verified', 'label' => 'Reconciliation Verification Queue'],
-        ];
-    }
+    // private function getTrackingMatrices()
+    // {
+    //     return [
+    //         ['table' => 'cash_in_required_approvers',  'column' => 'approved', 'label' => 'Cash In Approval Queue'],
+    //         ['table' => 'cash_in_required_verifiers',  'column' => 'verified', 'label' => 'Cash In Verification Queue'],
+    //         ['table' => 'cashout_required_approvers',  'column' => 'approved', 'label' => 'Cash Out Approval Queue'],
+    //         ['table' => 'cashout_required_verifiers',  'column' => 'verified', 'label' => 'Cash Out Verification Queue'],
+    //         ['table' => 'reconcile_required_approvers', 'column' => 'approved', 'label' => 'Reconciliation Approval Queue'],
+    //         ['table' => 'reconcile_required_verifiers', 'column' => 'verified', 'label' => 'Reconciliation Verification Queue'],
+    //     ];
+    // }
 
     public function checkArchiveEligibility($userId)
     {
         $pendingTasks = [];
-
-        // =========================================================================
         // 1. Check Pending Cash In Verifications
         // =========================================================================
         $pendingInVerifications = $this->cashInRequiredRepository->getPendingVerifierByUserId($userId);
-        // $pendingInVerifications = \App\Models\CashInRequiredVerifier::with(['cashIn.vault'])
-        //     ->where('user_id', $userId)
-        //     ->where('verified', false)
-        //     ->get();
 
         foreach ($pendingInVerifications as $pivot) {
             $pendingTasks[] = [
@@ -312,16 +287,9 @@ class UserService
                 'table'      => 'cash_in_required_verifiers'
             ];
         }
-
-        // =========================================================================
         // 2. Check Pending Cash In Approvals
         // =========================================================================
         $pendingInApprovals = $this->cashInRequiredRepository->getPendingApproveByUserId($userId);
-
-        // $pendingInApprovals = \App\Models\CashInRequiredApprover::with(['cashIn.vault'])
-        //     ->where('user_id', $userId)
-        //     ->where('approved', false)
-        //     ->get();
 
         foreach ($pendingInApprovals as $pivot) {
             $pendingTasks[] = [
@@ -332,17 +300,9 @@ class UserService
                 'table'      => 'cash_in_required_approvers'
             ];
         }
-
-        // =========================================================================
         // 3. Check Pending Cash Out Verifications
         // =========================================================================
-
         $pendingOutVerifications = $this->cashOutRequiredRepository->getPendingVerificationByUserId($userId);
-
-        // $pendingOutVerifications = \App\Models\CashoutRequiredVerifier::with(['cashOut.vault'])
-        //     ->where('user_id', $userId)
-        //     ->where('verified', false)
-        //     ->get();
 
         foreach ($pendingOutVerifications as $pivot) {
             $pendingTasks[] = [
@@ -353,16 +313,9 @@ class UserService
                 'table'       => 'cashout_required_verifiers'
             ];
         }
-
-        // =========================================================================
         // 4. Check Pending Cash Out Approvals
         // =========================================================================
         $pendingOutApprovals = $this->cashOutRequiredRepository->getPendingApproveByUserId($userId);
-
-        // $pendingOutApprovals = \App\Models\CashoutRequiredApprover::with(['cashOut.vault'])
-        //     ->where('user_id', $userId)
-        //     ->where('approved', false)
-        //     ->get();
 
         foreach ($pendingOutApprovals as $pivot) {
             $pendingTasks[] = [
@@ -374,8 +327,17 @@ class UserService
             ];
         }
 
+        $pendingReconcileVerifiers = $this->reconcileRequiredRepository->getPendingVerifierByUserId($userId);
 
-        // =========================================================================
+        foreach ($pendingReconcileVerifiers as $pivot) {
+            $pendingTasks[] = [
+                'id'          => $pivot->reconcile?->reconcile_tran_id,
+                'from_date' => $pivot->reconcile?->from_date,
+                'vault_name'  => $pivot->reconcile?->vault?->name ?? 'N/A',
+                'type'        => 'Reconcile Verification Required',
+                'table'       => 'reconcile_required_verifiers'
+            ];
+        }
         // 4. Check Pending Custodain Approvals
         // =========================================================================
 
@@ -493,9 +455,9 @@ class UserService
             return successResponse("Workflow responsibilities and vault assignments migrated successfully.", null, 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("User Workflow Migration Failure: " . $e->getMessage(), [
+            Log::error("User Workflow Migration Failure: " . $e->getMessage(), [
                 'user_id'        => $userId,
-                'target_user_id' => $targetUserId, // ← also fixed the bug here (was logging $userId twice)
+                'target_user_id' => $targetUserId,
             ]);
 
             return errorResponse("Migration failed: " . $e->getMessage(), null, 500);

@@ -339,7 +339,7 @@ class UserRepository
         return $user;
     }
 
-    public function checkUserPhoneNumberExistenceByUserId($phone)
+    public function checkUserPhoneNumberExistenceByUserId($phone, $userId)
     {
         return User::where('phone', $phone)
             ->where('id', '!=', $userId)

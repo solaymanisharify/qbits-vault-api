@@ -109,6 +109,7 @@ class ReconcileService
                 throw new \Exception($message);
             }
 
+            info($verifierUserIds);
             foreach ($verifierUserIds as $verifier) {
                 $this->reconcileRequired->createVerifier([
                     'reconcile_id' => $reconcile->id,

@@ -16,4 +16,11 @@ class ReconcileRequiredRepository
     {
         return ReconcileRequiredApprover::create($data);
     }
+
+    public function getPendingVerifierByUserId($userId)
+    {
+        return ReconcileRequiredVerifier::with('reconcile.vault')->where('user_id', $userId)
+            ->where('verified', false)
+            ->get();
+    }
 }
