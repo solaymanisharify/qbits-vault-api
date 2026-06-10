@@ -263,6 +263,8 @@ class ReconcileService
             []
         );
 
+;
+
         return successResponse("Successfully started reconcile", $reconcile, 200);
     }
 
@@ -283,7 +285,6 @@ class ReconcileService
         $reconcile->resolution_reason   = $data['resolution_reason'] ?? null;
         $reconcile->variance_type       = $data['variance_type'] ?? 'unknown';
         $reconcile->variance            = $data['total_variance'] ?? 0;
-        $reconcile->started_by        = auth()->user()->id;
         $reconcile->is_locked           = true;
         $reconcile->locked_until = now()->addHours(6);
 
