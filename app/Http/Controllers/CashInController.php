@@ -74,4 +74,9 @@ class CashInController extends Controller
     {
         return $this->cashInService->approved($id);
     }
+
+    public function reject(Request $request, $id)
+    {
+        return $this->cashInService->rejectCashIn($request->all(), $id);
+    }
 }

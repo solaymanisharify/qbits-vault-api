@@ -67,6 +67,7 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
     Route::get('/pending/cash-in', [CashInController::class, 'listPending']);
     Route::post('/verify/cash-in/{cashInId}', [CashInController::class, 'verify']);
     Route::post('/approve/cash-in/{cashInId}', [CashInController::class, 'approved']);
+    Route::post('/reject/cash-in/{cashInId}', [CashInController::class, 'reject']);
 
     // role
     Route::apiResource('/roles', RoleController::class);
@@ -88,6 +89,7 @@ Route::middleware(['auth:api', 'check.active'])->group(function () {
     Route::get('/vault/bag/{vaultId}', [VaultController::class, 'getBag']);
     Route::get('/bag/{bagId}', [VaultController::class, 'getBagByBagId']);
     Route::post('/bag/create-request', [VaultController::class, 'createBagRequest']);
+    Route::post('/vault/{vaultId}/bag', [VaultController::class, 'addBagToVault']);
 
     // vault audit config
     Route::apiResource('vault-audit-config', VaultAuditConfigController::class);

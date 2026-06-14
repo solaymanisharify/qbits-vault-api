@@ -627,6 +627,58 @@ class CashInService
 
         return successResponse('CashIn approved successfully', $result, 200);
     }
+    public function rejectCashIn($data, $cashInId)
+    {
+        $user   = auth()->user();
+        $cashIn = $this->find($cashInId);
+
+        if (!$cashIn) {
+            return errorResponse('Cash-in not found', [], 404);
+        }
+
+        if (!$user->can('cash-in.approve') && !$user->can('cash-in.verify')) {
+            return errorResponse('You do not have permission to reject', [], 403);
+        }
+
+        $type = $data['type'] ?? 'verifier';
+
+        if ($type === 'verifier' && $cashIn->verifier_status === 'rejected') {
+            return errorResponse('This cash-in has already been rejected by a verifier', [], 400);
+        }
+        if ($type === 'approver' && $cashIn->approver_status === 'rejected') {
+            return errorResponse('This cash-in has already been rejected by a casher', [], 400);
+        }
+
+        // Use the type sent from the frontend to know which side is rejecting
+
+        $updateData = [];
+
+        if ($type === 'verifier') {
+            $verifierRow = $cashIn->requiredVerifiers()->where('user_id', $user->id)->first();
+            if ($verifierRow) {
+                $verifierRow->update(['rejected_at' => now()]);
+            }
+            $updateData['verifier_status'] = 'rejected';
+        } else {
+            $approverRow = $cashIn->requiredApprovers()->where('user_id', $user->id)->first();
+            if ($approverRow) {
+                $approverRow->update(['rejected_at' => now()]);
+            }
+            $updateData['approver_status'] = 'rejected';
+        }
+
+        $cashIn->update($updateData);
+
+        $this->logService->activityLog(
+            'rejected',
+            'cashIn',
+            "Cash-in #{$cashIn->tran_id} rejected" . (!empty($data['note']) ? " — Note: {$data['note']}" : ""),
+            []
+        );
+
+        return successResponse('Cash-in rejected successfully', $cashIn->fresh(), 200);
+    }
+
     public function verify($request, $cashInId)
     {
 

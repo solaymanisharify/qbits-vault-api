@@ -12,11 +12,13 @@ class CashInRequiredApprover extends Model
         'user_id',
         'approved',
         'approved_at',
+        'rejected_at',
     ];
 
     protected $casts = [
         'approved' => 'boolean',
         'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function cashIn()
