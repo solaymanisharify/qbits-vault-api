@@ -18,7 +18,10 @@ class ReconcileRepository
             'requiredVerifiers.user:id,name,email',
             'startedBy:id,name,email',
             'completedBy',
-            'varianceBags:id,vault_id,barcode,rack_number',
+            'varianceBags' => function ($q) {
+                $q->select('vault_bags.id', 'vault_id', 'barcode', 'rack_number')
+                  ->withPivot('difference', 'note', 'counted_amount', 'expected_amount');
+            },
             'vault:id,vault_code,name',
         ]);
 
