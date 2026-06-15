@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\CashIn;
+use App\Models\CashOut;
 use App\Services\ActivityLoggerService;
 use App\Services\LogService;
 use App\Services\VaultBagService;
@@ -21,29 +23,36 @@ class ActivityLogController extends Controller
     {
         $bag = $this->vaultBagService->findVaultbagWithTrashedByBagId($bagId);
 
-        $history = collect($bag->history ?? [])
-            ->sortByDesc('timestamp')
-            ->values();
-
-        // Also pull system-wide activity logs for this bag
-        $activityLogs = ActivityLog::forSubject(\App\Models\VaultBag::class, $bagId)
+        // Cash-in transactions for this bag
+        $cashIns = CashIn::with('user')
+            ->where('bag_id', $bagId)
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn($log) => [
-                'event'       => $log->event,
-                'description' => $log->description,
-                'data'        => array_merge(
-                    $log->meta ?? [],
-                    ['old' => $log->old_values, 'new' => $log->new_values]
-                ),
-                'user_name'   => $log->user_name,
-                'timestamp'   => $log->created_at->toIso8601String(),
-                'source'      => 'system_log',
+            ->map(fn($c) => [
+                'event'       => 'Cash In',
+                'description' => '৳' . number_format($c->cash_in_amount, 2) . ' deposited — TXN: ' . $c->tran_id,
+                'user_name'   => $c->user?->name ?? 'N/A',
+                'timestamp'   => $c->created_at->toIso8601String(),
+                'status'      => $c->approver_status ?? $c->verifier_status ?? 'pending',
+                'source'      => 'cash_in',
             ]);
 
-        // Merge both sources, sorted by timestamp desc
-        $merged = collect($history->map(fn($h) => array_merge($h, ['source' => 'bag_history'])))
-            ->merge($activityLogs)
+        // Cash-out transactions for this bag (via cash_in_id → cash_in.bag_id)
+        $cashInIds = CashIn::where('bag_id', $bagId)->pluck('id');
+        $cashOuts = CashOut::with('user')
+            ->whereIn('cash_in_id', $cashInIds)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn($c) => [
+                'event'       => 'Cash Out',
+                'description' => '৳' . number_format($c->cash_out_amount, 2) . ' withdrawn — TXN: ' . $c->tran_id,
+                'user_name'   => $c->user?->name ?? 'N/A',
+                'timestamp'   => $c->created_at->toIso8601String(),
+                'status'      => $c->approver_status ?? $c->verifier_status ?? 'pending',
+                'source'      => 'cash_out',
+            ]);
+
+        $merged = $cashIns->merge($cashOuts)
             ->sortByDesc('timestamp')
             ->values();
 
