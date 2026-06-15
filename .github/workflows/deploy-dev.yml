@@ -62,6 +62,9 @@ jobs:
           rm -f bootstrap/cache/packages.php
           rm -f bootstrap/cache/services.php
 
+      - name: Run Database Migrations
+        run: php artisan migrate --force --no-interaction
+
       - name: Deploy Laravel to cPanel via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
