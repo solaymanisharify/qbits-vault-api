@@ -52,7 +52,10 @@ class AuthController extends Controller
             return errorResponse("Validation error", $validator->errors(), 422);
         }
 
-        $this->authService->changePassword($request->all());
+        $result = $this->authService->changePassword($request->all());
+        if ($result instanceof \Illuminate\Http\JsonResponse) {
+            return $result;
+        }
         return successResponse([], "Password changed successfully", 200);
     }
     public function superAdminChangeUserPassword(Request $request, $id)

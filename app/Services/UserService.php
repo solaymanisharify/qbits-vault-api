@@ -239,17 +239,32 @@ class UserService
 
         $this->otpService->create($user->id, $otp, 'email_verification');
 
-        $response = NotificationService::send(
-            new SendMessageRequest([
-                'message' => new TemplateMessage([
-                    'to' => [
-                        Recipient::email($user->email),
-                    ],
-                    'template' => 'vault_email_verify',
-                    'data'     => ['otp' => $otp],
-                ]),
-            ])
-        );
+        try {
+            $response = NotificationService::send(
+                new SendMessageRequest([
+                    'message' => new TemplateMessage([
+                        'to' => [
+                            Recipient::email($user->email),
+                        ],
+                        'template' => 'vault_email_verify',
+                        'data'     => ['otp' => $otp],
+                    ]),
+                ])
+            );
+
+            if (!$response->success) {
+                Log::error('Email OTP send failed', ['user_id' => $user->id]);
+                return errorResponse("Failed to send verification email. Please try again.", [], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Email OTP notification service error', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
+            return errorResponse("Notification service is not configured. Please contact support.", [], 500);
+        }
+
+        return successResponse("Verification email sent successfully.", [], 200);
     }
 
 

@@ -47,26 +47,36 @@ class UserVerificationService
         ]);
 
         // Send OTP via notification service
-        $result = NotificationService::send(
-            new SendMessageRequest([
-                'message' => new TemplateMessage([
-                    'to' => [
-                        Recipient::phone($request->phone),
-                    ],
-                    'template' => 'vault_email_verify',
-                    'data'     => ['otp' => $otp],
-                ]),
-            ])
-        );
+        try {
+            $result = NotificationService::send(
+                new SendMessageRequest([
+                    'message' => new TemplateMessage([
+                        'to' => [
+                            Recipient::phone($request->phone),
+                        ],
+                        'template' => 'vault_email_verify',
+                        'data'     => ['otp' => $otp],
+                    ]),
+                ])
+            );
 
-        if (!$result->success) {
-            Log::error('Phone OTP send failed', [
+            if (!$result->success) {
+                Log::error('Phone OTP send failed', [
+                    'user_id' => $user->id,
+                    'phone'   => $request->phone,
+                    'result'  => $result,
+                ]);
+
+                return errorResponse("Failed to send OTP. Please try again later.", [], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Phone OTP notification service error', [
                 'user_id' => $user->id,
                 'phone'   => $request->phone,
-                'result'  => $result,
+                'error'   => $e->getMessage(),
             ]);
 
-            return errorResponse("Failed to send OTP. Please try again later.", [], 500);
+            return errorResponse("Notification service is not configured. Please contact support.", [], 500);
         }
 
         return successResponse("OTP sent successfully.", [], 200);
