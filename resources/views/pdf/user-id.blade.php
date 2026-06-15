@@ -191,15 +191,18 @@
       position: absolute;
       bottom: 40px;
       left: 40px;
-      right: 40px;
-      border-top: 1px solid #e2e8f0; 
+      border-top: 1px solid #e2e8f0;
       padding-top: 12px;
+      border-collapse: collapse;
     }
     .footer-table td {
-      font-size: 9px; 
-      color: #94a3b8; 
+      font-size: 9px;
+      color: #94a3b8;
       font-family: monospace;
       font-weight: 600;
+    }
+    .footer-table td:last-child {
+      padding-right: 80px;
     }
   </style>
 </head>
@@ -225,7 +228,7 @@
         @if($profileImg)
           <img src="{{ $profileImg }}" class="profile-img" alt="Profile Image">
         @else
-          <div class="profile-img" style="height: 150px; background: #f8fafc; border: 1px dashed #cbd5e1; text-align: center; line-height: 150px; color: #94a3b8; font-size: 12px;">No Photo</div>
+          <div class="profile-img" style="height: 150px; background: #f8fafc; border: 1px dashed #cbd5e1; text-align: center; line-height: 150px; color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">NO PHOTO</div>
         @endif
         {{-- <div>
           @foreach($user->roles as $role)
@@ -301,7 +304,7 @@
   <table class="footer-table">
     <tr>
       <td style="text-align: left;">THIS IS A SYSTEM GENERATED DOCUMENT</td>
-      <td style="text-align: right;">SECURITY HASH: {{ strtoupper(substr(md5($user->id), 0, 16)) }}</td>
+      <td style="text-align: right;">SECURITY HASH: SEC-{{ $user->id }}X79</td>
     </tr>
   </table>
 
